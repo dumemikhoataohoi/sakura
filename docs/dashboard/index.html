@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zumi journal</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1d1d1b; --muted:#6b6b66; --line:#d9d8d2; --card:#ffffff; --up:#1f7a4d; --down:#b3261e; --accent:#2f5d9e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151514; --fg:#ecebe6; --muted:#a19f97; --line:#3a3936; --card:#1e1e1c; --up:#5cc08c; --down:#ef7b72; --accent:#7fa8e0; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:1040px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  h2 { font-size:16px; margin:28px 0 8px; }
+  p.note { color:var(--muted); margin:0 0 16px; font-size:13px; }
+  select { font:inherit; padding:4px 8px; background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; margin-top:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .card .k { color:var(--muted); font-size:12px; }
+  .card .v { font-size:20px; font-variant-numeric:tabular-nums; }
+  .chart { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px; }
+  svg { width:100%; height:220px; display:block; }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; font-size:14px; }
+  th, td { text-align:right; padding:5px 8px; border-bottom:1px solid var(--line); }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:600; }
+  .wrap { overflow-x:auto; }
+  .up { color:var(--up); } .down { color:var(--down); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Zumi trade journal</h1>
+  <p class="note">Generated from <code>data.json</code> by <code>scripts/daily_summary.py</code>. Money in % of balance only; R uses the stop-loss at entry; account shown as a hash.</p>
+  <label>Account <select id="acct"></select></label>
+  <div class="cards" id="cards"></div>
+  <h2>Cumulative closed P/L (%) and R</h2>
+  <div class="chart"><svg id="curve" role="img" aria-label="Cumulative P/L chart"></svg></div>
+  <h2>By method</h2>
+  <div class="wrap"><table id="method"></table></div>
+  <h2>By phase</h2>
+  <div class="wrap"><table id="phase"></table></div>
+  <h2>Daily</h2>
+  <div class="wrap"><table id="daily"></table></div>
+</main>
+<script>
+"use strict";
+const fmt = (v, d = 2, sign = false) => (v === null || v === undefined) ? "-" : (sign && v > 0 ? "+" : "") + Number(v).toFixed(d);
+const cls = v => v > 0 ? "up" : v < 0 ? "down" : "";
+function el(tag, attrs = {}, text) {
+  const e = document.createElementNS(tag === "svg" || attrs.svg ? "http://www.w3.org/2000/svg" : "http://www.w3.org/1999/xhtml", tag);
+  for (const [k, v] of Object.entries(attrs)) if (k !== "svg") e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+function table(node, head, rows) {
+  node.replaceChildren();
+  const tr = el("tr"); head.forEach(h => tr.appendChild(el("th", {}, h))); node.appendChild(tr);
+  rows.forEach(r => { const row = el("tr"); r.forEach(c => { const td = el("td", c.cls ? { class: c.cls } : {}, c.t ?? c); row.appendChild(td); }); node.appendChild(row); });
+}
+function groupRows(groups) {
+  return Object.entries(groups || {}).map(([k, m]) => [k, String(m.n), fmt(m.win_pct, 1), fmt(m.pf),
+    { t: fmt(m.sum_r, 2, true), cls: cls(m.sum_r) }, { t: fmt(m.sum_pct, 3, true), cls: cls(m.sum_pct) }]);
+}
+function curve(svg, positions) {
+  svg.replaceChildren();
+  const W = svg.clientWidth || 800, H = 220, P = 28;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  if (!positions.length) { svg.appendChild(el("text", { svg: 1, x: P, y: H / 2, fill: "currentColor" }, "No closed trades yet")); return; }
+  let cp = 0, cr = 0; const a = [0], b = [0];
+  positions.forEach(p => { cp += p.pl || 0; cr += p.r || 0; a.push(cp); b.push(cr); });
+  const series = [[a, "var(--accent)", "%"], [b, "var(--muted)", "R"]];
+  series.forEach(([vals, color, label], idx) => {
+    const lo = Math.min(...vals, 0), hi = Math.max(...vals, 0), span = (hi - lo) || 1;
+    const x = i => P + i * (W - 2 * P) / Math.max(1, vals.length - 1);
+    const y = v => H - P - (v - lo) * (H - 2 * P) / span;
+    if (idx === 0) svg.appendChild(el("line", { svg: 1, x1: P, x2: W - P, y1: y(0), y2: y(0), stroke: "var(--line)" }));
+    const d = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+    svg.appendChild(el("path", { svg: 1, d, fill: "none", stroke: color, "stroke-width": idx ? 1.5 : 2.5, "stroke-dasharray": idx ? "4 3" : "" }));
+    const last = vals[vals.length - 1];
+    svg.appendChild(el("text", { svg: 1, x: W - P + 2, y: y(last) + 4, fill: color, "font-size": 12 }, `${fmt(last, 2, true)}${label}`));
+  });
+}
+function render(data, acct) {
+  const a = data.accounts[acct]; if (!a) return;
+  const m = a.metrics;
+  const cards = [["Trades", m.n], ["Win %", fmt(m.win_pct, 1)], ["Profit factor", fmt(m.pf)], ["Expectancy R", fmt(m.exp_r, 3, true)],
+    ["Sum R", fmt(m.sum_r, 2, true)], ["Sum %", fmt(m.sum_pct, 2, true)], ["Max L-streak", m.max_loss_streak], ["L-streak now", m.end_loss_streak]];
+  const box = document.getElementById("cards"); box.replaceChildren();
+  cards.forEach(([k, v]) => { const c = el("div", { class: "card" }); c.appendChild(el("div", { class: "k" }, k)); c.appendChild(el("div", { class: "v" }, String(v))); box.appendChild(c); });
+  curve(document.getElementById("curve"), a.positions);
+  const head = ["key", "n", "win %", "PF", "sum R", "sum %"];
+  table(document.getElementById("method"), head, groupRows(a.by_method));
+  table(document.getElementById("phase"), head, groupRows(a.by_phase));
+  const days = Object.entries(a.daily).sort().reverse().slice(0, 60);
+  table(document.getElementById("daily"), ["day (UTC)", "trades", "R", "P/L %"],
+    days.map(([d, x]) => [d, String(x.n), { t: fmt(x.r, 2, true), cls: cls(x.r) }, { t: fmt(x.pl_pct, 3, true), cls: cls(x.pl_pct) }]));
+}
+fetch("data.json", { cache: "no-store" }).then(r => r.json()).then(data => {
+  const sel = document.getElementById("acct");
+  const accts = Object.keys(data.accounts || {});
+  accts.forEach(k => sel.appendChild(el("option", { value: k }, k)));
+  if (!accts.length) { document.getElementById("cards").textContent = "No EA reports yet."; return; }
+  sel.addEventListener("change", () => render(data, sel.value));
+  render(data, accts[0]);
+}).catch(() => { document.getElementById("cards").textContent = "data.json not found (no EA reports yet)."; });
+</script>
+</body>
+</html>

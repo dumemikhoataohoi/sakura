@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# Local credentials: NEVER commit tokens (GitHub PAT, Telegram bot token, Discord webhook URL)
+.env
+.env.*
+*.token
+*token*.txt
+*.pem
+*.key
+config/local*.json
+
+# MT5 local files (cache, queue, state) if someone copies them into the repo
+zumi_gh_*.json
+zumi_gh_*.txt
+*.ex5
+*.ex4
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Temp files from atomic writes
+.tmp_*

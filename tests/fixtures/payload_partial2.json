@@ -1,0 +1,12 @@
+{
+  "v": 1, "kind": "ea_report", "acct": "a1b2c3d4e5f60718", "rid": "a1b2c3d4e5f60718-1795690000",
+  "part": 2, "parts": 2, "ts": 1795690000,
+  "data": {
+    "trades": [
+      {"deal": 2002, "pos": 601, "sym": "XAUUSDm", "side": "buy", "vol": 0.05, "vol_in": 0.10,
+       "t_in": 1795680000, "t_out": 1795684000, "in": 4100.0, "out": 4120.0, "sl": 4090.0, "tp": 4120.0,
+       "r": 2.0, "pl_pct": 1.0, "risk_pct": 1.0, "cmt": "M3 breakout", "magic": 7001, "phase": "TREND", "reason": "tp",
+       "mae_r": -0.4, "mfe_r": 2.1}
+    ]
+  }
+}

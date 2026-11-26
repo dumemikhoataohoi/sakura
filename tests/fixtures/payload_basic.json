@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "kind": "ea_report",
+  "acct": "A1B2C3D4E5F60718AAAA",
+  "rid": "a1b2c3d4e5f60718-1795620000",
+  "part": 1,
+  "parts": 1,
+  "ts": 1795620000,
+  "data": {
+    "ea": "ZumiXAU",
+    "ver": "1.00",
+    "reason": "periodic",
+    "phase": "TREND",
+    "eq": {"day_pl_pct": -3.4, "eq_day_pct": -3.6, "float_pct": -0.2, "margin_level": 950.0, "balance": 10000.0},
+    "mkt": {"sym": "XAUUSDm", "bid": 4190.5, "pc": 4130.0, "atr": 38.0, "move": 60.5, "move_atr": 1.59, "spread": 0.2},
+    "trades": [
+      {"deal": 1001, "pos": 501, "sym": "XAUUSDm", "side": "buy", "vol": 0.10, "vol_in": 0.10,
+       "t_in": 1795570000, "t_out": 1795572000, "in": 4100.0, "out": 4090.0, "sl": 4090.0, "tp": 4120.0,
+       "r": -1.0, "pl_pct": -1.0, "risk_pct": 1.0, "cmt": "M3 breakout", "magic": 7001, "phase": "TREND",
+       "reason": "sl", "mae_r": -1.0, "mfe_r": 0.3, "pl": -100.0},
+      {"deal": 1002, "pos": 502, "sym": "XAUUSDm", "side": "sell", "vol": 0.10, "vol_in": 0.10,
+       "t_in": 1795575000, "t_out": 1795577000, "in": 4110.0, "out": 4120.0, "sl": 4120.0, "tp": 4090.0,
+       "r": -1.0, "pl_pct": -1.0, "risk_pct": 1.5, "cmt": "M1 fade", "magic": 7001, "phase": "RANGE",
+       "reason": "sl"},
+      {"deal": 1003, "pos": 503, "sym": "XAUUSDm", "side": "buy", "vol": 0.10, "vol_in": 0.10,
+       "t_in": 1795580000, "t_out": 1795582000, "in": 4130.0, "out": 4120.0, "sl": 0, "tp": 0,
+       "pl_pct": -0.7, "cmt": "manual", "magic": 0, "phase": "", "reason": "client"},
+      {"deal": 1004, "pos": 504, "sym": "XAUUSDm", "side": "buy", "vol": 0.10, "vol_in": 0.10,
+       "t_in": 1795613500, "t_out": 1795615000, "in": 4140.0, "out": 4130.0, "sl": 4130.0, "tp": 4160.0,
+       "r": -1.0, "pl_pct": -0.5, "risk_pct": 0.5, "cmt": "M3 breakout", "magic": 7001, "phase": "TREND",
+       "reason": "sl"}
+    ],
+    "log": [
+      {"t": 1795570100, "m": "PHASE RANGE -> TREND (ADX 31)"},
+      {"t": 1795580100, "m": "analysis: London open, bias long"}
+    ],
+    "flags": [{"key": "spread_wide", "msg": "spread 0.9 > 0.5 limit", "t": 1795580200}]
+  }
+}

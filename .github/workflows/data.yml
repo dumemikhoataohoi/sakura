@@ -1,0 +1,42 @@
+name: data
+
+# Hourly macro/calendar refresh. The minute is offset from :00 because GitHub's
+# scheduler is congested at the top of the hour.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit data/ back to the default branch
+
+concurrency:
+  group: data-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch FRED + calendar (+ optional gold), build data/latest.json
+        id: build
+        run: python scripts/build_latest.py --msg-file "$RUNNER_TEMP/commit_msg.txt"
+
+      - name: Commit only when data changed
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          bash scripts/commit_push.sh "$RUNNER_TEMP/commit_msg.txt" \
+            "python scripts/build_latest.py --msg-file $RUNNER_TEMP/commit_msg.txt" \
+            data/

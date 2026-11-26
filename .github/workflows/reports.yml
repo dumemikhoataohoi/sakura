@@ -1,0 +1,46 @@
+name: reports
+
+# The EA sends reports with:
+#   POST https://api.github.com/repos/<owner>/<repo>/dispatches
+#   {"event_type": "ea_report", "client_payload": {...}}
+# client_payload is untrusted input: it is only ever read from the event FILE by
+# Python (never interpolated into a shell command with ${{ }}).
+on:
+  repository_dispatch:
+    types: [ea_report]
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: "Test payload: a client_payload JSON object (see docs/data-dictionary.md)"
+        required: true
+        type: string
+
+permissions:
+  contents: write   # commit reports/ and docs/dashboard/data.json
+
+# No concurrency group on purpose: GitHub keeps only ONE pending run per group and
+# cancels older pending runs, which would silently drop EA reports. Races on push are
+# handled by scripts/commit_push.sh (pull --rebase, then reset + regenerate, retried).
+
+jobs:
+  store:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Store report, update journal and summaries
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          regen='python scripts/store_report.py --event "$GITHUB_EVENT_PATH" --dates-out "$RUNNER_TEMP/dates.txt" --msg-out "$RUNNER_TEMP/commit_msg.txt" && python scripts/daily_summary.py --dates-file "$RUNNER_TEMP/dates.txt"'
+          bash -c "$regen"
+          bash scripts/commit_push.sh "$RUNNER_TEMP/commit_msg.txt" "$regen" reports/ docs/dashboard/

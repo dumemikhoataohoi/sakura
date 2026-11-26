@@ -1,0 +1,8 @@
+# test calendar
+date,event,time_et,flag
+2026-03-06,NFP,08:30,
+2026-03-18,FOMC,14:00,
+2026-11-06,NFP,08:30,uncertain
+2026-11-25,CPI,08:30,
+2026-11-27,NFP,08:30,uncertain
+2026-12-09,FOMC,14:00,

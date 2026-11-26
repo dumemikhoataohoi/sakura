@@ -1,0 +1,51 @@
+name: alerts
+
+# Runs after every data / reports run (success or failure) and on demand.
+# Posts new alerts as ONE comment on the open PR labelled "zumi-alerts"
+# (creates branch "alerts" + the PR if missing). Claude subscribes to that PR.
+on:
+  workflow_run:
+    workflows: ["data", "reports"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print the alerts, do not comment"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write        # only used to create the 'alerts' branch + marker commit when missing
+  pull-requests: write   # open the alerts PR
+  issues: write          # labels and comments (PR comments use the issues API)
+
+concurrency:
+  group: alerts
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != 'cancelled'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Evaluate rules and comment on the alerts PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python scripts/alerts.py
