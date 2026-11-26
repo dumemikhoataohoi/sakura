@@ -1,17 +1,27 @@
 {
   "fred": {
-    "series": ["DGS10", "DGS2", "DFII10", "T10YIE", "DTWEXBGS", "VIXCLS", "DCOILWTICO", "SP500"],
+    "series": [
+      "DGS10",
+      "DGS2",
+      "DFII10",
+      "T10YIE",
+      "DTWEXBGS",
+      "VIXCLS",
+      "DCOILWTICO",
+      "SP500"
+    ],
     "start": "2018-01-01",
     "refetch_days": 60,
     "timeout_s": 30
   },
   "gold": {
-    "enabled": true,
+    "enabled": false,
     "source": "stooq",
     "symbol": "xauusd",
     "start": "2018-01-01",
     "refetch_days": 60,
-    "timeout_s": 20
+    "timeout_s": 20,
+    "note": "stooq returned a non-CSV page from GitHub runners (2026-11-26); keep disabled unless a working source is configured"
   },
   "calendar": {
     "file": "data/calendar/events_us.csv",
@@ -22,17 +32,65 @@
     "stale_after_h": 36
   },
   "quality": {
-    "max_age_days": {"default": 7, "DTWEXBGS": 14},
-    "range": {
-      "DGS10": [-2, 25], "DGS2": [-2, 25], "DFII10": [-5, 10], "T10YIE": [-2, 10],
-      "DTWEXBGS": [50, 250], "VIXCLS": [5, 150], "DCOILWTICO": [-60, 400], "SP500": [500, 50000],
-      "XAUUSD": [200, 20000]
+    "max_age_days": {
+      "default": 7,
+      "DTWEXBGS": 14
     },
-    "max_abs_c1": {"DGS10": 1.0, "DGS2": 1.25, "DFII10": 1.0, "T10YIE": 0.75, "DTWEXBGS": 5.0},
-    "max_abs_c1p": {"VIXCLS": 150, "DCOILWTICO": 60, "SP500": 15, "XAUUSD": 15},
+    "range": {
+      "DGS10": [
+        -2,
+        25
+      ],
+      "DGS2": [
+        -2,
+        25
+      ],
+      "DFII10": [
+        -5,
+        10
+      ],
+      "T10YIE": [
+        -2,
+        10
+      ],
+      "DTWEXBGS": [
+        50,
+        250
+      ],
+      "VIXCLS": [
+        5,
+        150
+      ],
+      "DCOILWTICO": [
+        -60,
+        400
+      ],
+      "SP500": [
+        500,
+        50000
+      ],
+      "XAUUSD": [
+        200,
+        20000
+      ]
+    },
+    "max_abs_c1": {
+      "DGS10": 1.0,
+      "DGS2": 1.25,
+      "DFII10": 1.0,
+      "T10YIE": 0.75,
+      "DTWEXBGS": 5.0
+    },
+    "max_abs_c1p": {
+      "VIXCLS": 150,
+      "DCOILWTICO": 60,
+      "SP500": 15,
+      "XAUUSD": 15
+    },
     "min_series_ok": 6
   },
   "reports": {
+    "public_mode": true,
     "max_trades_per_part": 500,
     "max_log_lines": 400,
     "max_flags": 50,
@@ -47,7 +105,11 @@
     "risk_cap_pct": 1.0,
     "news_block_before_min": 15,
     "news_block_after_min": 15,
-    "news_events": ["NFP", "CPI", "FOMC"],
+    "news_events": [
+      "NFP",
+      "CPI",
+      "FOMC"
+    ],
     "dd_episode_min_pct": 1.0
   },
   "alerts": {
@@ -62,9 +124,14 @@
     "ea_daily_loss_pct": 3.0,
     "losing_streak_n": 4,
     "event_lookahead_h": 24,
-    "event_types": ["NFP", "CPI", "FOMC"],
+    "event_types": [
+      "NFP",
+      "CPI",
+      "FOMC"
+    ],
     "data_stale_h": 48,
     "report_max_age_h": 6,
-    "rule_break_lookback_h": 48
+    "rule_break_lookback_h": 48,
+    "dd_alert_pct": 5.0
   }
 }

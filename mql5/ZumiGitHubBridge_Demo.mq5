@@ -7,6 +7,8 @@
 //|  Install: copy both files to MQL5\Experts\Zumi\ , compile this   |
 //|  file in MetaEditor, allow the WebRequest URLs (see the .mqh     |
 //|  header), then set InpGhEnable=true and the token/salt inputs.   |
+//|  Keep InpGhReportMode=0 (aggregate statistics) for a PUBLIC repo.|
+//|  ZGB_Log() lines are only published in mode 1 (private repo).    |
 //+------------------------------------------------------------------+
 #property copyright "Zumi XAU EA project"
 #property version   "1.00"

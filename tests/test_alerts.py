@@ -69,8 +69,10 @@ class FakeGitHubAPI:
 
 
 class AlertRulesTest(unittest.TestCase):
+    """Detail-mode (v1) rules, run against a private-mode root."""
+
     def setUp(self):
-        self.root = make_root()
+        self.root = make_root(public_mode=False)
         self.cfg = load_config(self.root)
 
     def build_with_vix_jump(self, now):

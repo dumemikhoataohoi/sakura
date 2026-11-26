@@ -14,8 +14,8 @@
         |
         |  POST /repos/<owner>/<repo>/dispatches  {event_type: "ea_report", client_payload}
         v
-  reports.yml --> scripts/store_report.py --> reports/YYYY/MM/DD/<acct>_<ts>.json
-                                         \--> reports/journal/<acct>/deals.jsonl (+ positions.csv)
+  reports.yml --> scripts/store_report.py (+ agg.py whitelist validator) --> reports/YYYY/MM/DD/<acct>_<ts>.json
+                 (public repo: aggregate v2 only; per-trade v1 + journal only when reports.public_mode=false)
               --> scripts/daily_summary.py --> reports/daily|weekly|monthly/*.md, docs/dashboard/data.json
                                                                    |
   alerts.yml (workflow_run after data / reports, + manual) --> scripts/alerts.py
@@ -52,8 +52,9 @@
   overwrites the last good `latest.json`.
 * **Idempotency.** Reports are stored by content; deals are upserted by ticket; positions and summaries are derived.
   Re-sending a report (EA retry, queue replay) changes nothing.
-* **Privacy.** Account hash only (salted in the EA), money only in %, secrets masked in every stored string and commit
-  message, no tokens in the repository.
+* **Privacy.** The repo is public, so the EA sends aggregated statistics only (no trades, times, prices, SL/TP,
+  tickets); method names become local codes; reports leave at clock-aligned slots; account hash only (salted in the
+  EA); money only in %; secrets masked in every stored string and commit message; no tokens in the repository.
 * **Minimal permissions.** Workflows use only `GITHUB_TOKEN`: `contents: write` for data/reports, plus
   `pull-requests: write` and `issues: write` for alerts. The EA's PAT is a fine-grained token limited to this repository.
 * **PR comments as the notification bus.** Claude subscribes to the alerts PR. Hidden `<!-- zumi-alert-key: ... -->` markers

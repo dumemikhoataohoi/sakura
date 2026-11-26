@@ -3,8 +3,14 @@
 //|  Zumi XAU EA <-> GitHub repo "sakura" data bot                   |
 //|                                                                  |
 //|  READ : data/latest.json (macro / calendar context) -> ZGB_ReadLatest()
-//|  WRITE: trade + analysis reports -> repository_dispatch "ea_report"
+//|  WRITE: reports -> repository_dispatch "ea_report"              |
 //|         (ZGB_SendReport / automatic from ZGB_OnTimer)            |
+//|   InpGhReportMode = 0 (default, PUBLIC repo): AGGREGATED stats   |
+//|     only (schema v2 "ea_agg"): per period day / rolling week /   |
+//|     month to date; no trades, times, prices, SL/TP or tickets;   |
+//|     methods as codes M001.. (map kept ONLY in MQL5\Files).      |
+//|   InpGhReportMode = 1: full per-trade detail (schema v1) - ONLY  |
+//|     for a PRIVATE repo (a public repo rejects it).               |
 //|  OPTIONAL instant channels: Telegram bot, Discord webhook (off)  |
 //|                                                                  |
 //|  SETUP (MT5 > Tools > Options > Expert Advisors >                |
@@ -24,7 +30,10 @@
 //|  * Strategy Tester: WebRequest is not available there, so the    |
 //|    module switches itself off (ReadLatest -> false, no sends).   |
 //|  * Privacy: the account is sent only as a salted SHA-256 hash;   |
-//|    money only as % of balance; the token is never printed.       |
+//|    money only as % of balance; the token is never printed. In    |
+//|    aggregate mode reports leave only at slot boundaries          |
+//|    (InpGhReportEveryMin) with the timestamp rounded to the slot, |
+//|    so report times do not reveal trade times.                    |
 //|  * repository_dispatch limits: client_payload may have at most   |
 //|    10 top-level keys (we use 8). GitHub does not publish an exact |
 //|    byte limit, large bodies are rejected, so each request is kept |
@@ -41,7 +50,7 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "1.0"
+#define ZGB_VERSION "2.0"
 
 input group "=== Zumi GitHub bridge ==="
 input bool   InpGhEnable          = false;               // Enable the GitHub bridge
@@ -57,10 +66,15 @@ input string InpGhApiBase         = "https://api.github.com";            // GitH
 input int    InpGhTimeoutMs       = 3000;                // WebRequest timeout ms (500..5000)
 input int    InpGhReadEveryMin    = 30;                  // Re-download latest.json every N minutes
 input int    InpGhMaxAgeHours     = 36;                  // latest.json older than this = no data
-input int    InpGhReportEveryMin  = 30;                  // Min minutes between periodic reports
+input int    InpGhReportMode      = 0;                   // 0 = aggregate stats (public repo), 1 = full detail (ONLY for a PRIVATE repo)
+input int    InpGhReportEveryMin  = 60;                  // Report slot in minutes (sent at slot boundaries)
 input int    InpGhDayEndHour      = 23;                  // Day-end report, server hour
 input int    InpGhDayEndMinute    = 45;                  // Day-end report, server minute
-input string InpGhAccountSalt     = "change-me";         // Salt for the account hash (keep private)
+input string InpGhAccountSalt     = "change-me";         // Salt for account hash + method codes (keep private)
+input string InpGhMethodMapFile   = "zumi_method_codes.csv"; // Local method->code map in MQL5\Files (never commit)
+input double InpGhRiskCapPct      = 1.0;                 // Rule: risk per trade above this % counts as a break
+input double InpGhDailyCapPct     = 3.0;                 // Rule: a day with closed P/L <= -this % counts as a break
+input int    InpGhNewsBlockMin    = 15;                  // Rule: entry within +-N min of NFP/CPI/FOMC is a break
 input long   InpGhMagicFilter     = -1;                  // Report only this magic (-1 = all)
 input string InpGhSymbolFilter    = "";                  // Report only this symbol ("" = all)
 input string InpGhMarketSymbol    = "";                  // Symbol for market context ("" = chart)
@@ -119,6 +133,26 @@ double   g_zgbTrkMin[];
 double   g_zgbTrkMax[];
 string   g_zgbTrkPhase[];
 datetime g_zgbLastTrack  = 0;
+long     g_zgbDirtySlot  = -1;      // report slot in which the last closing deal was seen
+long     g_zgbFlagSlot   = -1;      // 15-minute slot in which the first pending flag was raised
+string   g_zgbMapName[];            // method name -> code (local file only)
+string   g_zgbMapCode[];
+long     g_zgbEvT[];                // NFP/CPI/FOMC times (UTC) seen in latest.json, for the news rule
+
+struct ZgbPos                       // one CLOSED position, used only inside the EA for aggregation
+  {
+   long              id;
+   datetime          t_in;          // server time of the first entry
+   datetime          t_out;         // server time of the last exit
+   double            r;             // volume-weighted R (entry SL)
+   bool              has_r;
+   double            pl;            // net result, % of balance
+   string            mcode;         // method code M000..M999
+   string            phase;
+   bool              no_sl, risk_over, news;
+   double            mae, mfe;
+   bool              has_ex;
+  };
 
 #define ZGB_MAX_LOG    120
 #define ZGB_MAX_FLAGS  20
@@ -126,6 +160,8 @@ datetime g_zgbLastTrack  = 0;
 #define ZGB_MAX_TRACK  200
 #define ZGB_CACHE_FILE "zumi_gh_latest.json"
 #define ZGB_QUEUE_GLOB "zumi_gh_q_*.json"
+#define ZGB_EVENTS_FILE "zumi_gh_events.txt"
+#define ZGB_MIN_CELL_N 3
 
 //+------------------------------------------------------------------+
 //| small helpers                                                    |
@@ -510,6 +546,120 @@ void ZGB_LoadToken(void)
 
 string ZGB_GvName(const string what) { return("ZGB_" + g_zgbAcct + "_" + what); }
 
+//+------------------------------------------------------------------+
+//| method name -> code (M001..M999). The mapping lives ONLY in the  |
+//| local file InpGhMethodMapFile ("code,name" per line); codes are  |
+//| derived from a salted hash, so they are stable even if the file  |
+//| is lost (collisions are resolved by the file).                   |
+//+------------------------------------------------------------------+
+void ZGB_MapLoad(void)
+  {
+   ArrayResize(g_zgbMapName, 0);
+   ArrayResize(g_zgbMapCode, 0);
+   if(StringLen(InpGhMethodMapFile) == 0 || !FileIsExist(InpGhMethodMapFile, ZGB_FileFlags())) return;
+   int h = FileOpen(InpGhMethodMapFile, FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | ZGB_FileFlags());
+   if(h == INVALID_HANDLE) return;
+   while(!FileIsEnding(h))
+     {
+      string line = ZGB_Trim(FileReadString(h));
+      int c = StringFind(line, ",");
+      if(c != 4 || StringSubstr(line, 0, 1) != "M") continue;
+      int n = ArraySize(g_zgbMapName);
+      ArrayResize(g_zgbMapName, n + 1);
+      ArrayResize(g_zgbMapCode, n + 1);
+      g_zgbMapCode[n] = StringSubstr(line, 0, 4);
+      g_zgbMapName[n] = StringSubstr(line, 5);
+     }
+   FileClose(h);
+  }
+
+bool ZGB_CodeUsed(const string code)
+  {
+   for(int i = 0; i < ArraySize(g_zgbMapCode); i++) if(g_zgbMapCode[i] == code) return(true);
+   return(false);
+  }
+
+string ZGB_MethodCode(const string method)
+  {
+   string name = ZGB_Trim(method);
+   StringReplace(name, ",", " ");
+   if(StringLen(name) == 0) return("M000");
+   for(int i = 0; i < ArraySize(g_zgbMapName); i++) if(g_zgbMapName[i] == name) return(g_zgbMapCode[i]);
+   string src = InpGhAccountSalt + ":method:" + name;
+   uchar data[], key[], res[];
+   StringToCharArray(src, data, 0, StringLen(src), CP_UTF8);
+   ArrayResize(key, 0);
+   int v = 1;
+   if(CryptEncode(CRYPT_HASH_SHA256, data, key, res) >= 2) v = ((int)res[0] * 256 + (int)res[1]) % 999 + 1;
+   string code = StringFormat("M%03d", v);
+   for(int k = 0; k < 999 && ZGB_CodeUsed(code); k++) { v = v % 999 + 1; code = StringFormat("M%03d", v); }
+   int n = ArraySize(g_zgbMapName);
+   ArrayResize(g_zgbMapName, n + 1);
+   ArrayResize(g_zgbMapCode, n + 1);
+   g_zgbMapName[n] = name;
+   g_zgbMapCode[n] = code;
+   if(StringLen(InpGhMethodMapFile) > 0)
+     {
+      int h = FileOpen(InpGhMethodMapFile, FILE_READ | FILE_WRITE | FILE_TXT | FILE_ANSI | ZGB_FileFlags());
+      if(h != INVALID_HANDLE)
+        {
+         FileSeek(h, 0, SEEK_END);
+         FileWriteString(h, code + "," + name + "\r\n");
+         FileClose(h);
+        }
+     }
+   return(code);
+  }
+
+//--- NFP/CPI/FOMC times seen in latest.json are remembered locally for the news rule
+void ZGB_EventsLoad(void)
+  {
+   ArrayResize(g_zgbEvT, 0);
+   if(!FileIsExist(ZGB_EVENTS_FILE, ZGB_FileFlags())) return;
+   int h = FileOpen(ZGB_EVENTS_FILE, FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | ZGB_FileFlags());
+   if(h == INVALID_HANDLE) return;
+   while(!FileIsEnding(h))
+     {
+      long t = StringToInteger(ZGB_Trim(FileReadString(h)));
+      if(t <= 0) continue;
+      int n = ArraySize(g_zgbEvT);
+      ArrayResize(g_zgbEvT, n + 1);
+      g_zgbEvT[n] = t;
+     }
+   FileClose(h);
+  }
+
+void ZGB_EventsRemember(const string &s)
+  {
+   bool changed = false;
+   string lists[2] = {"events.next.", "events.recent."};
+   for(int l = 0; l < 2; l++)
+      for(int k = 0; k < 8; k++)
+        {
+         double t;
+         if(!ZGB_JNumber(s, lists[l] + IntegerToString(k) + ".t", t)) break;
+         bool known = false;
+         for(int i = 0; i < ArraySize(g_zgbEvT); i++) if(g_zgbEvT[i] == (long)t) { known = true; break; }
+         if(known) continue;
+         int n = ArraySize(g_zgbEvT);
+         if(n >= 400) { for(int i = 1; i < n; i++) g_zgbEvT[i - 1] = g_zgbEvT[i]; n--; }
+         ArrayResize(g_zgbEvT, n + 1);
+         g_zgbEvT[n] = (long)t;
+         changed = true;
+        }
+   if(!changed) return;
+   string text = "";
+   for(int i = 0; i < ArraySize(g_zgbEvT); i++) text += IntegerToString(g_zgbEvT[i]) + "\n";
+   ZGB_WriteFile(ZGB_EVENTS_FILE, text);
+  }
+
+bool ZGB_InNewsBlock(const long t_utc)
+  {
+   long w = (long)MathMax(0, InpGhNewsBlockMin) * 60;
+   for(int i = 0; i < ArraySize(g_zgbEvT); i++) if(MathAbs(t_utc - g_zgbEvT[i]) <= w) return(true);
+   return(false);
+  }
+
 bool ZGB_Init(void)
   {
    g_zgbNetOk = false;
@@ -523,6 +673,12 @@ bool ZGB_Init(void)
    g_zgbAcct = ZGB_AccountHash();
    ZGB_LoadToken();
    ZGB_ReadFile(ZGB_CACHE_FILE, g_zgbLatest);
+   ZGB_MapLoad();
+   ZGB_EventsLoad();
+   ZGB_PosxLoad();
+   if(StringLen(g_zgbLatest) > 0) ZGB_EventsRemember(g_zgbLatest);
+   if(InpGhReportMode != 0)
+      Print("ZumiGitHubBridge: WARNING InpGhReportMode=1 sends every trade (times, prices, SL/TP). Use it ONLY with a PRIVATE repository.");
    if(GlobalVariableCheck(ZGB_GvName("dayend"))) g_zgbDayEndKey = (int)GlobalVariableGet(ZGB_GvName("dayend"));
    if(!GlobalVariableCheck(ZGB_GvName("ld_t")))
      {
@@ -535,9 +691,10 @@ bool ZGB_Init(void)
      }
    if(InpGhAccountSalt == "change-me")
       Print("ZumiGitHubBridge: WARNING InpGhAccountSalt is the default; set your own private salt so the account hash cannot be reversed.");
-   PrintFormat("ZumiGitHubBridge %s: repo %s/%s@%s, %s read, token %s, account hash %s",
+   PrintFormat("ZumiGitHubBridge %s: repo %s/%s@%s, %s read, token %s, account hash %s, report mode %s",
                ZGB_VERSION, InpGhOwner, InpGhRepo, InpGhBranch, InpGhPrivateRepo ? "API" : "raw",
-               StringLen(g_zgbToken) > 0 ? "set" : "NOT set (reports disabled)", g_zgbAcct);
+               StringLen(g_zgbToken) > 0 ? "set" : "NOT set (reports disabled)", g_zgbAcct,
+               InpGhReportMode == 0 ? "aggregate" : "DETAIL (private repo only)");
    return(true);
   }
 
@@ -583,6 +740,7 @@ bool ZGB_FetchLatest(void)
      {
       g_zgbLatest = body;
       ZGB_WriteFile(ZGB_CACHE_FILE, body);
+      ZGB_EventsRemember(g_zgbLatest);
       g_zgbReadFails = 0;
       g_zgbNextRead = now + (int)MathMax(1, InpGhReadEveryMin) * 60;
       return(true);
@@ -695,8 +853,12 @@ void ZGB_Flag(const string key, const string msg)
    int n = ArraySize(g_zgbFlagJson);
    if(n >= ZGB_MAX_FLAGS) return;
    ArrayResize(g_zgbFlagJson, n + 1);
-   g_zgbFlagJson[n] = StringFormat("{\"key\":\"%s\",\"msg\":\"%s\",\"t\":%I64d}", ZGB_Esc(StringSubstr(key, 0, 40)),
-                                   ZGB_Esc(StringSubstr(msg, 0, 280)), (long)TimeGMT());
+   if(InpGhReportMode == 0)   // published: no timestamp, short message (do not put prices in it)
+      g_zgbFlagJson[n] = StringFormat("{\"key\":\"%s\",\"msg\":\"%s\"}", ZGB_Esc(StringSubstr(key, 0, 40)),
+                                      ZGB_Esc(StringSubstr(msg, 0, 150)));
+   else
+      g_zgbFlagJson[n] = StringFormat("{\"key\":\"%s\",\"msg\":\"%s\",\"t\":%I64d}", ZGB_Esc(StringSubstr(key, 0, 40)),
+                                      ZGB_Esc(StringSubstr(msg, 0, 280)), (long)TimeGMT());
    ZGB_Notify("Zumi " + g_zgbAcct + ": " + msg);
   }
 
@@ -809,7 +971,7 @@ bool ZGB_IsTradeDeal(const ulong d)
   }
 
 // Equity block in % only. day start = server midnight.
-string ZGB_EquityJson(void)
+string ZGB_EquityJson(const bool with_margin = true)
   {
    MqlDateTime t;
    TimeToStruct(TimeTradeServer(), t);
@@ -833,12 +995,15 @@ string ZGB_EquityJson(void)
    double day_pl = (b0 > 0) ? trade_net / b0 * 100.0 : EMPTY_VALUE;
    double eq_day = (b0 > 0) ? (eq - b0 - other_net) / b0 * 100.0 : EMPTY_VALUE;
    double flt    = (bal > 0) ? (eq - bal) / bal * 100.0 : EMPTY_VALUE;
+   if(!with_margin)
+      return(StringFormat("{\"day_pl_pct\":%s,\"eq_day_pct\":%s,\"float_pct\":%s}",
+                          ZGB_Num(day_pl, 3), ZGB_Num(eq_day, 3), ZGB_Num(flt, 3)));
    return(StringFormat("{\"day_pl_pct\":%s,\"eq_day_pct\":%s,\"float_pct\":%s,\"margin_level\":%s}",
                        ZGB_Num(day_pl, 3), ZGB_Num(eq_day, 3), ZGB_Num(flt, 3),
                        ZGB_Num(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 1)));
   }
 
-string ZGB_MarketJson(void)
+string ZGB_MarketJson(const bool full = true)
   {
    string sym = (StringLen(InpGhMarketSymbol) > 0) ? InpGhMarketSymbol : _Symbol;
    int dg = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
@@ -858,6 +1023,8 @@ string ZGB_MarketJson(void)
    double atr = (n == 14) ? sum / 14.0 : EMPTY_VALUE;
    double mv  = (bid > 0 && pc > 0) ? bid - pc : EMPTY_VALUE;
    double mva = (mv != EMPTY_VALUE && atr != EMPTY_VALUE && atr > 0) ? mv / atr : EMPTY_VALUE;
+   if(!full)   // aggregate mode: no prices, only the normalised move
+      return(StringFormat("{\"sym\":\"%s\",\"move_atr\":%s}", ZGB_Esc(sym), ZGB_Num(mva, 2)));
    return(StringFormat("{\"sym\":\"%s\",\"bid\":%s,\"pc\":%s,\"d1_open\":%s,\"atr\":%s,\"move\":%s,\"move_atr\":%s,\"spread\":%s}",
                        ZGB_Esc(sym), ZGB_Num(bid, dg), ZGB_Num(pc, dg), ZGB_Num(op, dg), ZGB_Num(atr, dg),
                        ZGB_Num(mv, dg), ZGB_Num(mva, 3), ZGB_Num((ask > 0 && bid > 0) ? ask - bid : EMPTY_VALUE, dg)));
@@ -987,6 +1154,368 @@ int ZGB_CollectTrades(string &items[], ulong &max_ticket, datetime &max_time)
    return(ArraySize(items));
   }
 
+//+------------------------------------------------------------------+
+//| AGGREGATE MODE: closed positions -> per-period statistics        |
+//+------------------------------------------------------------------+
+//--- phase / MAE / MFE of closed positions, kept in a LOCAL file so month-to-date stats stay stable
+//--- across restarts (line: id,close_unix,phase,has_ex,mae,mfe). Never published as such.
+long     g_zgbXId[];
+long     g_zgbXT[];
+string   g_zgbXPh[];
+bool     g_zgbXHas[];
+double   g_zgbXMae[];
+double   g_zgbXMfe[];
+#define ZGB_POSX_FILE "zumi_gh_posx.csv"
+
+void ZGB_PosxLoad(void)
+  {
+   ArrayResize(g_zgbXId, 0); ArrayResize(g_zgbXT, 0); ArrayResize(g_zgbXPh, 0);
+   ArrayResize(g_zgbXHas, 0); ArrayResize(g_zgbXMae, 0); ArrayResize(g_zgbXMfe, 0);
+   if(!FileIsExist(ZGB_POSX_FILE, ZGB_FileFlags())) return;
+   int h = FileOpen(ZGB_POSX_FILE, FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | ZGB_FileFlags());
+   if(h == INVALID_HANDLE) return;
+   while(!FileIsEnding(h))
+     {
+      string f[];
+      if(StringSplit(ZGB_Trim(FileReadString(h)), ',', f) != 6) continue;
+      int n = ArraySize(g_zgbXId);
+      ArrayResize(g_zgbXId, n + 1); ArrayResize(g_zgbXT, n + 1); ArrayResize(g_zgbXPh, n + 1);
+      ArrayResize(g_zgbXHas, n + 1); ArrayResize(g_zgbXMae, n + 1); ArrayResize(g_zgbXMfe, n + 1);
+      g_zgbXId[n] = StringToInteger(f[0]);
+      g_zgbXT[n] = StringToInteger(f[1]);
+      g_zgbXPh[n] = f[2];
+      g_zgbXHas[n] = (f[3] == "1");
+      g_zgbXMae[n] = StringToDouble(f[4]);
+      g_zgbXMfe[n] = StringToDouble(f[5]);
+     }
+   FileClose(h);
+  }
+
+void ZGB_PosxSave(void)
+  {
+   long cutoff = (long)TimeGMT() - 45 * 86400;   // month to date + rolling week never need more
+   string text = "";
+   for(int i = 0; i < ArraySize(g_zgbXId); i++)
+      if(g_zgbXT[i] >= cutoff)
+         text += StringFormat("%I64d,%I64d,%s,%d,%.3f,%.3f\n", g_zgbXId[i], g_zgbXT[i], g_zgbXPh[i],
+                              g_zgbXHas[i] ? 1 : 0, g_zgbXMae[i], g_zgbXMfe[i]);
+   ZGB_WriteFile(ZGB_POSX_FILE, text);
+  }
+
+int ZGB_PosxFind(const long id)
+  {
+   for(int i = ArraySize(g_zgbXId) - 1; i >= 0; i--) if(g_zgbXId[i] == id) return(i);
+   return(-1);
+  }
+
+void ZGB_PosxAdd(const long id, const long t_close, const string phase, const bool has, const double mae, const double mfe)
+  {
+   int n = ArraySize(g_zgbXId);
+   ArrayResize(g_zgbXId, n + 1); ArrayResize(g_zgbXT, n + 1); ArrayResize(g_zgbXPh, n + 1);
+   ArrayResize(g_zgbXHas, n + 1); ArrayResize(g_zgbXMae, n + 1); ArrayResize(g_zgbXMfe, n + 1);
+   string ph = phase;
+   StringReplace(ph, ",", " ");
+   g_zgbXId[n] = id; g_zgbXT[n] = t_close; g_zgbXPh[n] = ph;
+   g_zgbXHas[n] = has; g_zgbXMae[n] = mae; g_zgbXMfe[n] = mfe;
+  }
+
+// Loads every position whose exits fall in [from, now] and that is fully closed.
+int ZGB_LoadPositions(const datetime from, ZgbPos &ps[])
+  {
+   ArrayResize(ps, 0);
+   if(!HistorySelect(from, TimeTradeServer() + 86400)) return(0);
+   int total = HistoryDealsTotal();
+   ulong  tks[];
+   double nets[], base[];
+   ArrayResize(tks, total); ArrayResize(nets, total); ArrayResize(base, total);
+   for(int i = 0; i < total; i++) { tks[i] = HistoryDealGetTicket(i); nets[i] = (tks[i] > 0) ? ZGB_DealNet(tks[i]) : 0; }
+   double bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   double suffix = 0;
+   for(int i = total - 1; i >= 0; i--) { suffix += nets[i]; base[i] = bal - suffix; }
+   ulong  xt[];
+   double xb[];
+   long   pids[];
+   int nx = 0, np = 0;
+   bool posx_changed = false;
+   for(int i = 0; i < total; i++)
+     {
+      ulong d = tks[i];
+      if(d == 0 || !ZGB_IsTradeDeal(d)) continue;
+      long entry = HistoryDealGetInteger(d, DEAL_ENTRY);
+      if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_OUT_BY && entry != DEAL_ENTRY_INOUT) continue;
+      if(!ZGB_PassFilter(HistoryDealGetString(d, DEAL_SYMBOL), HistoryDealGetInteger(d, DEAL_MAGIC))) continue;
+      ArrayResize(xt, nx + 1); ArrayResize(xb, nx + 1);
+      xt[nx] = d; xb[nx] = base[i]; nx++;
+      long pid = HistoryDealGetInteger(d, DEAL_POSITION_ID);
+      bool seen = false;
+      for(int k = 0; k < np; k++) if(pids[k] == pid) { seen = true; break; }
+      if(!seen) { ArrayResize(pids, np + 1); pids[np++] = pid; }
+     }
+   for(int j = 0; j < np; j++)
+     {
+      if(PositionSelectByTicket((ulong)pids[j])) continue;    // still open: counted once closed
+      if(!HistorySelectByPosition(pids[j])) continue;          // NOTE: replaces the history selection
+      double entry_px = 0, sl = 0, vol_in = 0, entry_comm = 0, vol_out = 0;
+      long   etype = -1;
+      ulong  entry_order = 0;
+      datetime t_in = 0, t_out = 0;
+      string cmt = "";
+      double ex_px[], ex_vol[], ex_net[];
+      ulong  ex_tk[];
+      int ne = 0;
+      int nd = HistoryDealsTotal();
+      for(int k = 0; k < nd; k++)
+        {
+         ulong e = HistoryDealGetTicket(k);
+         if(e == 0 || !ZGB_IsTradeDeal(e)) continue;
+         long en = HistoryDealGetInteger(e, DEAL_ENTRY);
+         if(en == DEAL_ENTRY_IN)
+           {
+            if(t_in == 0)
+              {
+               t_in = (datetime)HistoryDealGetInteger(e, DEAL_TIME);
+               entry_px = HistoryDealGetDouble(e, DEAL_PRICE);
+               sl = HistoryDealGetDouble(e, DEAL_SL);
+               etype = HistoryDealGetInteger(e, DEAL_TYPE);
+               cmt = HistoryDealGetString(e, DEAL_COMMENT);
+               entry_order = (ulong)HistoryDealGetInteger(e, DEAL_ORDER);
+              }
+            vol_in += HistoryDealGetDouble(e, DEAL_VOLUME);
+            entry_comm += HistoryDealGetDouble(e, DEAL_COMMISSION) + HistoryDealGetDouble(e, DEAL_FEE);
+           }
+         else
+           {
+            ArrayResize(ex_px, ne + 1); ArrayResize(ex_vol, ne + 1); ArrayResize(ex_net, ne + 1); ArrayResize(ex_tk, ne + 1);
+            ex_px[ne] = HistoryDealGetDouble(e, DEAL_PRICE);
+            ex_vol[ne] = HistoryDealGetDouble(e, DEAL_VOLUME);
+            ex_net[ne] = ZGB_DealNet(e);
+            ex_tk[ne] = e;
+            datetime te = (datetime)HistoryDealGetInteger(e, DEAL_TIME);
+            if(te > t_out) t_out = te;
+            vol_out += ex_vol[ne];
+            ne++;
+           }
+        }
+      if(ne == 0 || t_in == 0 || vol_in <= 0 || vol_out < vol_in - 1e-8) continue;
+      if(sl == 0 && entry_order > 0 && HistoryOrderSelect(entry_order))
+         sl = HistoryOrderGetDouble(entry_order, ORDER_SL);
+      bool buy = (etype == DEAL_TYPE_BUY);
+      string sym = HistoryDealGetString(ex_tk[0], DEAL_SYMBOL);
+      double risk = (sl > 0) ? MathAbs(entry_px - sl) : 0;
+      double r = 0, pl = 0, last_base = bal;
+      for(int k = 0; k < ne; k++)
+        {
+         double b = last_base;
+         for(int q = 0; q < nx; q++) if(xt[q] == ex_tk[k]) { b = xb[q]; break; }
+         last_base = b;
+         double net = ex_net[k] + entry_comm * ex_vol[k] / vol_in;
+         if(b > 0) pl += net / b * 100.0;
+         if(risk > 0) r += (buy ? ex_px[k] - entry_px : entry_px - ex_px[k]) / risk * ex_vol[k] / vol_in;
+        }
+      int n = ArraySize(ps);
+      ArrayResize(ps, n + 1);
+      ps[n].id = pids[j];
+      ps[n].t_in = t_in;
+      ps[n].t_out = t_out;
+      ps[n].r = r;
+      ps[n].has_r = (risk > 0);
+      ps[n].pl = pl;
+      ps[n].mcode = ZGB_MethodCode(cmt);
+      ps[n].no_sl = (sl <= 0);
+      double loss = 0;
+      ps[n].risk_over = (sl > 0 && last_base > 0 &&
+                         OrderCalcProfit(buy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, sym, vol_in, entry_px, sl, loss) &&
+                         MathAbs(loss) / last_base * 100.0 > InpGhRiskCapPct + 1e-9);
+      ps[n].news = ZGB_InNewsBlock(ZGB_ToUtc(t_in));
+      ps[n].phase = "none";
+      ps[n].has_ex = false;
+      ps[n].mae = 0;
+      ps[n].mfe = 0;
+      int xi = ZGB_PosxFind(pids[j]);
+      int tk = ZGB_TrkFind(pids[j]);
+      if(xi < 0 && tk >= 0)
+        {
+         // first time this closed position is aggregated: move its tracker data to the local file
+         string ph = (StringLen(g_zgbTrkPhase[tk]) > 0) ? g_zgbTrkPhase[tk] : "none";
+         bool has = (risk > 0 && g_zgbTrkMin[tk] < DBL_MAX);
+         double mae = has ? MathMin(0, buy ? (g_zgbTrkMin[tk] - entry_px) / risk : (entry_px - g_zgbTrkMax[tk]) / risk) : 0;
+         double mfe = has ? (buy ? (g_zgbTrkMax[tk] - entry_px) / risk : (entry_px - g_zgbTrkMin[tk]) / risk) : 0;
+         ZGB_PosxAdd(pids[j], ZGB_ToUtc(t_out), ph, has, mae, mfe);
+         xi = ZGB_PosxFind(pids[j]);
+         posx_changed = true;
+        }
+      if(tk >= 0) ZGB_TrkRemove(pids[j]);   // closed: free the tracker slot
+      if(xi >= 0)
+        {
+         ps[n].phase = g_zgbXPh[xi];
+         ps[n].has_ex = g_zgbXHas[xi];
+         ps[n].mae = g_zgbXMae[xi];
+         ps[n].mfe = g_zgbXMfe[xi];
+        }
+     }
+   if(posx_changed) ZGB_PosxSave();
+   return(ArraySize(ps));
+  }
+
+int ZGB_Outcome(const double pl) { return(pl > 0 ? 1 : (pl < 0 ? -1 : 0)); }
+
+void ZGB_GroupAdd(string &keys[], int &kn[], int &kw[], double &kr[], const string key, const bool win, const double r)
+  {
+   int i = 0, n = ArraySize(keys);
+   for(; i < n; i++) if(keys[i] == key) break;
+   if(i == n)
+     {
+      ArrayResize(keys, n + 1); ArrayResize(kn, n + 1); ArrayResize(kw, n + 1); ArrayResize(kr, n + 1);
+      keys[n] = key; kn[n] = 0; kw[n] = 0; kr[n] = 0;
+     }
+   kn[i]++;
+   if(win) kw[i]++;
+   kr[i] += r;
+  }
+
+string ZGB_GroupJson(string &keys[], int &kn[], int &kw[], double &kr[])
+  {
+   string out = "";
+   for(int i = 0; i < ArraySize(keys); i++)
+      out += (i > 0 ? "," : "") + StringFormat("\"%s\":{\"n\":%d,\"wins\":%d,\"win_pct\":%s,\"net_r\":%s}",
+                                                ZGB_Esc(keys[i]), kn[i], kw[i],
+                                                ZGB_Num(kn[i] > 0 ? 100.0 * kw[i] / kn[i] : EMPTY_VALUE, 1), ZGB_Num(kr[i], 3));
+   return("{" + out + "}");
+  }
+
+string ZGB_Date(const datetime t) { return(StringSubstr(TimeToString(t, TIME_DATE), 0, 10)); }   // "YYYY.MM.DD"
+
+string ZGB_IsoDate(const datetime t)
+  {
+   MqlDateTime d;
+   TimeToStruct(t, d);
+   return(StringFormat("%04d-%02d-%02d", d.year, d.mon, d.day));
+  }
+
+// Statistics of the positions closed in [from, now] (server time). No times, prices or tickets leave here.
+string ZGB_AggJson(ZgbPos &ps[], const datetime from, const bool with_grid)
+  {
+   int total = ArraySize(ps);
+   int idx[];
+   int m = 0;
+   for(int i = 0; i < total; i++)
+      if(ps[i].t_out >= from) { ArrayResize(idx, m + 1); idx[m++] = i; }
+   for(int i = 1; i < m; i++)   // order by exit time
+     {
+      int v = idx[i], j = i - 1;
+      while(j >= 0 && ps[idx[j]].t_out > ps[v].t_out) { idx[j + 1] = idx[j]; j--; }
+      idx[j + 1] = v;
+     }
+   int wins = 0, losses = 0, be = 0, max_ls = 0, cur_ls = 0, lead_ls = 0, n_r = 0, n_ex = 0;
+   int no_sl = 0, risk_cap = 0, news = 0, daily_cap = 0;
+   bool lead_open = true;
+   double net_r = 0, gw = 0, gl = 0, net_pct = 0, cum = 0, peak = 0, dd = 0, mae = 0, mfe = 0;
+   string mk[], pk[], dk[];
+   int mn[], mw[], pn[], pw[];
+   double mr[], pr[], dv[];
+   int gn[42], gw2[42];
+   ArrayInitialize(gn, 0);
+   ArrayInitialize(gw2, 0);
+   for(int q = 0; q < m; q++)
+     {
+      int i = idx[q];
+      int oc = ZGB_Outcome(ps[i].pl);
+      if(oc > 0) wins++; else if(oc < 0) losses++; else be++;
+      if(oc < 0) { cur_ls++; if(cur_ls > max_ls) max_ls = cur_ls; if(lead_open) lead_ls++; }
+      else { cur_ls = 0; lead_open = false; }
+      if(ps[i].has_r) { n_r++; net_r += ps[i].r; if(ps[i].r > 0) gw += ps[i].r; else gl -= ps[i].r; }
+      net_pct += ps[i].pl;
+      cum += ps[i].pl;
+      if(cum > peak) peak = cum;
+      if(peak - cum > dd) dd = peak - cum;
+      if(ps[i].no_sl) no_sl++;
+      if(ps[i].risk_over) risk_cap++;
+      if(ps[i].news) news++;
+      if(ps[i].has_ex) { n_ex++; mae += ps[i].mae; mfe += ps[i].mfe; }
+      ZGB_GroupAdd(mk, mn, mw, mr, ps[i].mcode, oc > 0, ps[i].has_r ? ps[i].r : 0);
+      ZGB_GroupAdd(pk, pn, pw, pr, ps[i].phase, oc > 0, ps[i].has_r ? ps[i].r : 0);
+      // daily cap: closed P/L per server day
+      string day = ZGB_Date(ps[i].t_out);
+      int di = 0, nd = ArraySize(dk);
+      for(; di < nd; di++) if(dk[di] == day) break;
+      if(di == nd) { ArrayResize(dk, nd + 1); ArrayResize(dv, nd + 1); dk[nd] = day; dv[nd] = 0; }
+      dv[di] += ps[i].pl;
+      // coarse grid: weekday x 4-hour bucket of the entry time (UTC)
+      MqlDateTime t;
+      TimeToStruct((datetime)ZGB_ToUtc(ps[i].t_in), t);
+      int cell = ((t.day_of_week + 6) % 7) * 6 + t.hour / 4;
+      gn[cell]++;
+      if(oc > 0) gw2[cell]++;
+     }
+   for(int i = 0; i < ArraySize(dv); i++) if(dv[i] <= -InpGhDailyCapPct) daily_cap++;
+   string grid = "";
+   if(with_grid)
+     {
+      string wdn[7] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+      for(int w = 0; w < 7; w++)
+        {
+         string row = "";
+         for(int b = 0; b < 6; b++)
+           {
+            int c = w * 6 + b;
+            if(gn[c] == 0) continue;
+            string cellj = (gn[c] >= ZGB_MIN_CELL_N) ? StringFormat("{\"n\":%d,\"wins\":%d}", gn[c], gw2[c])
+                                                     : StringFormat("{\"n\":%d}", gn[c]);   // small cell: count only
+            row += (StringLen(row) > 0 ? "," : "") + StringFormat("\"%02d\":%s", b * 4, cellj);
+           }
+         if(StringLen(row) > 0) grid += (StringLen(grid) > 0 ? "," : "") + "\"" + wdn[w] + "\":{" + row + "}";
+        }
+      grid = ",\"grid\":{" + grid + "}";
+     }
+   int n = m;
+   string out = StringFormat(
+      "{\"from\":\"%s\",\"to\":\"%s\",\"n\":%d,\"wins\":%d,\"losses\":%d,\"be\":%d,\"win_pct\":%s,\"net_r\":%s,"
+      "\"avg_r\":%s,\"gross_win_r\":%s,\"gross_loss_r\":%s,\"pf\":%s,\"net_pct\":%s,\"max_ls\":%d,\"cur_ls\":%d,"
+      "\"lead_ls\":%d,\"dd_pct\":%s,\"n_r\":%d,\"n_ex\":%d,\"mae_r\":%s,\"mfe_r\":%s,"
+      "\"rule\":{\"no_sl\":%d,\"risk_cap\":%d,\"news\":%d,\"daily_cap\":%d},\"by_method\":%s,\"by_phase\":%s%s}",
+      ZGB_IsoDate(from), ZGB_IsoDate(TimeTradeServer()), n, wins, losses, be,
+      ZGB_Num(wins + losses > 0 ? 100.0 * wins / (wins + losses) : EMPTY_VALUE, 1), ZGB_Num(net_r, 3),
+      ZGB_Num(n > 0 ? net_r / n : EMPTY_VALUE, 3), ZGB_Num(gw, 3), ZGB_Num(gl, 3),
+      ZGB_Num(gl > 0 ? gw / gl : EMPTY_VALUE, 2), ZGB_Num(net_pct, 3), max_ls, cur_ls, lead_ls, ZGB_Num(dd, 3),
+      n_r, n_ex, ZGB_Num(n_ex > 0 ? mae / n_ex : EMPTY_VALUE, 3), ZGB_Num(n_ex > 0 ? mfe / n_ex : EMPTY_VALUE, 3),
+      no_sl, risk_cap, news, daily_cap, ZGB_GroupJson(mk, mn, mw, mr), ZGB_GroupJson(pk, pn, pw, pr), grid);
+   return(out);
+  }
+
+// Builds one aggregate (v2) report and queues it. ts is rounded down to round_sec.
+bool ZGB_BuildAggReport(const string reason, const long round_sec)
+  {
+   datetime now_srv = TimeTradeServer();
+   MqlDateTime t;
+   TimeToStruct(now_srv, t);
+   t.hour = 0; t.min = 0; t.sec = 0;
+   datetime day0 = StructToTime(t);
+   t.day = 1;
+   datetime month0 = StructToTime(t);
+   datetime week0 = now_srv - 7 * 86400;
+   ZgbPos ps[];
+   ZGB_LoadPositions((datetime)MathMin((long)week0, (long)month0), ps);
+   long ts = (long)TimeGMT();
+   if(round_sec > 0) ts -= ts % round_sec;
+   string rid = g_zgbAcct + "-" + IntegerToString(ts);
+   string data = StringFormat("{\"ea\":\"Zumi\",\"ver\":\"%s\",\"reason\":\"%s\",\"day\":\"%s\",\"phase\":\"%s\","
+                              "\"eq\":%s,\"mkt\":%s,\"periods\":{\"day\":%s,\"week\":%s,\"mtd\":%s},\"flags\":%s}",
+                              ZGB_VERSION, ZGB_Esc(reason), ZGB_IsoDate(now_srv), ZGB_Esc(g_zgbPhase),
+                              ZGB_EquityJson(false), ZGB_MarketJson(false),
+                              ZGB_AggJson(ps, day0, false), ZGB_AggJson(ps, week0, false), ZGB_AggJson(ps, month0, true),
+                              ZGB_FlagsJson());
+   string body = StringFormat("{\"event_type\":\"ea_report\",\"client_payload\":{\"v\":2,\"kind\":\"ea_agg\",\"acct\":\"%s\","
+                              "\"rid\":\"%s\",\"part\":1,\"parts\":1,\"ts\":%I64d,\"data\":%s}}", g_zgbAcct, rid, ts, data);
+   if(!ZGB_Enqueue(body, ts, 1)) { Print("ZumiGitHubBridge: could not write the report queue file"); return(false); }
+   ArrayResize(g_zgbFlagJson, 0);
+   ArrayResize(g_zgbLogMsg, 0);   // log lines are never published in aggregate mode
+   ArrayResize(g_zgbLogT, 0);
+   g_zgbDirty = false;
+   g_zgbDirtySlot = -1;
+   g_zgbFlagSlot = -1;
+   return(true);
+  }
+
 string ZGB_LogJson(const int max_bytes)
   {
    // newest lines win when the budget is tight
@@ -1023,12 +1552,18 @@ bool ZGB_Enqueue(const string body, const long ts, const int part)
    return(ZGB_WriteFile(name, body));
   }
 
-// Build the report (split into parts if needed) and put it in the local queue.
-// Network sending happens in ZGB_FlushQueue() from ZGB_OnTimer().
-bool ZGB_BuildReport(const string reason)
+// Build the report and put it in the local queue (network sending happens in ZGB_FlushQueue()).
+bool ZGB_BuildReport(const string reason, const long round_sec = 0)
   {
    if(!InpGhEnable || !g_zgbNetOk) return(false);
    if(StringLen(g_zgbToken) == 0) return(false);
+   if(InpGhReportMode == 0) return(ZGB_BuildAggReport(reason, round_sec));
+   return(ZGB_BuildDetailReport(reason));
+  }
+
+// DETAIL MODE (schema v1, PRIVATE repositories only): every closing deal, split into parts if needed.
+bool ZGB_BuildDetailReport(const string reason)
+  {
    string items[];
    ulong max_k;
    datetime max_t;
@@ -1077,6 +1612,8 @@ bool ZGB_BuildReport(const string reason)
       ArrayResize(g_zgbLogT, 0);
       ArrayResize(g_zgbFlagJson, 0);
       g_zgbDirty = false;
+      g_zgbDirtySlot = -1;
+      g_zgbFlagSlot = -1;
      }
    else Print("ZumiGitHubBridge: could not write the report queue file");
    return(ok);
@@ -1206,22 +1743,29 @@ void ZGB_OnTimer(void)
       TimeToStruct(TimeTradeServer(), st);
       int day_key = st.year * 10000 + st.mon * 100 + st.day;
       bool day_end = (st.hour > InpGhDayEndHour || (st.hour == InpGhDayEndHour && st.min >= InpGhDayEndMinute));
+      // Reports leave only at slot boundaries: something that happened in slot k is reported at the
+      // start of slot k+1 with ts rounded to that boundary, so report times do not reveal trade times.
+      long slot_len = (long)MathMax(1, InpGhReportEveryMin) * 60;
+      long slot = (long)now / slot_len;
+      long fslot = (long)now / 900;
+      if(g_zgbDirty && g_zgbDirtySlot < 0) g_zgbDirtySlot = slot;
+      if(ArraySize(g_zgbFlagJson) > 0 && g_zgbFlagSlot < 0) g_zgbFlagSlot = fslot;
       if(day_end && day_key != g_zgbDayEndKey)
         {
-         if(ZGB_BuildReport("dayend"))
+         if(ZGB_BuildReport("dayend", 900))
            {
             g_zgbDayEndKey = day_key;
             GlobalVariableSet(ZGB_GvName("dayend"), (double)day_key);
             g_zgbLastReport = now;
            }
         }
-      else if(ArraySize(g_zgbFlagJson) > 0 && now - g_zgbLastFlagReport >= 300)
+      else if(g_zgbFlagSlot >= 0 && fslot > g_zgbFlagSlot)
         {
-         if(ZGB_BuildReport("flag")) { g_zgbLastFlagReport = now; g_zgbLastReport = now; }
+         if(ZGB_BuildReport("flag", 900)) { g_zgbLastFlagReport = now; g_zgbLastReport = now; }
         }
-      else if(g_zgbDirty && (long)(now - g_zgbLastReport) >= (long)MathMax(1, InpGhReportEveryMin) * 60)
+      else if(g_zgbDirtySlot >= 0 && slot > g_zgbDirtySlot)
         {
-         if(ZGB_BuildReport("periodic")) g_zgbLastReport = now;
+         if(ZGB_BuildReport("periodic", slot_len)) g_zgbLastReport = now;
         }
      }
 
@@ -1236,8 +1780,8 @@ void ZGB_OnTimer(void)
 void ZGB_Deinit(void)
   {
    if(!InpGhEnable || !g_zgbNetOk || StringLen(g_zgbToken) == 0) return;
-   if(g_zgbDirty || ArraySize(g_zgbLogMsg) > 0 || ArraySize(g_zgbFlagJson) > 0)
-      ZGB_BuildReport("deinit");
+   if(g_zgbDirty || ArraySize(g_zgbFlagJson) > 0 || (InpGhReportMode != 0 && ArraySize(g_zgbLogMsg) > 0))
+      ZGB_BuildReport("deinit", (long)MathMax(1, InpGhReportEveryMin) * 60);
   }
 
 #endif // ZUMI_GITHUB_BRIDGE_MQH

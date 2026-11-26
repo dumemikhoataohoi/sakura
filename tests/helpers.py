@@ -13,9 +13,15 @@ FIXTURES = HERE / "fixtures"
 sys.path.insert(0, str(REPO / "scripts"))
 
 
-def make_root(events: str = "events_small.csv") -> Path:
+def make_root(events: str = "events_small.csv", public_mode: bool = True) -> Path:
+    """Temp repo root. public_mode=False emulates a PRIVATE repo that accepts per-trade (v1) reports."""
     root = Path(tempfile.mkdtemp(prefix="sakura_test_"))
     shutil.copytree(REPO / "config", root / "config")
+    if not public_mode:
+        path = root / "config" / "settings.json"
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+        cfg["reports"]["public_mode"] = False
+        path.write_text(json.dumps(cfg), encoding="utf-8")
     (root / "data" / "calendar").mkdir(parents=True)
     shutil.copy(FIXTURES / events, root / "data" / "calendar" / "events_us.csv")
     return root

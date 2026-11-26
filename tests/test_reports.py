@@ -48,8 +48,10 @@ class SanitizeTest(unittest.TestCase):
 
 
 class StoreTest(unittest.TestCase):
+    """v1 per-trade reports: private detail mode only."""
+
     def setUp(self):
-        self.root = make_root()
+        self.root = make_root(public_mode=False)
 
     def test_path_and_idempotency(self):
         res = store_report.store(self.root, fixture_json("payload_basic.json"), NOW)
@@ -108,7 +110,7 @@ class StatsTest(unittest.TestCase):
 
 class SummaryTest(unittest.TestCase):
     def setUp(self):
-        self.root = make_root()
+        self.root = make_root(public_mode=False)
         store_report.store(self.root, fixture_json("payload_basic.json"), NOW)
         store_report.store(self.root, fixture_json("payload_partial.json"), NOW)
         store_report.store(self.root, fixture_json("payload_partial2.json"), NOW)
@@ -120,6 +122,7 @@ class SummaryTest(unittest.TestCase):
         self.assertIn("reports/weekly/2026-W48.md", names)
         self.assertIn("reports/monthly/2026-11.md", names)
         self.assertIn("docs/dashboard/data.json", names)
+        self.assertIn("reports/weekly/2026-W48.md", names)
         day = (self.root / "reports/daily/2026-11-25.md").read_text()
         self.assertIn("| 4 | 0 / 4 / 0 | 0.0 |", day)
         for rule in ("no_sl", "risk_cap", "news", "daily_cap"):

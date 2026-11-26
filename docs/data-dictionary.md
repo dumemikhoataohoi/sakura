@@ -25,7 +25,7 @@ changes once per UTC day, which doubles as a heartbeat).
 | `events.recent[]` | list | Releases in the last 24 h (same fields). |
 | `events.covered_until` | date | Last date in the calendar file. Extend it before this date passes. |
 | `flags.vix_high`, `flags.vix_jump` | 0/1 | VIX >= `alerts.vix_level`; last VIX change >= `vix_jump_pct` % or `vix_jump_abs` points. |
-| `gold` (optional) | object | stooq XAUUSD D-1: `d`, `c` close, `c1`, `c1p`, `rng`, `atr14` (ATR known before `d`), `move_atr` = `c1 / atr14`, `age`. Omitted when stooq is unreachable. |
+| `gold` (optional) | object | stooq XAUUSD D-1: `d`, `c` close, `c1`, `c1p`, `rng`, `atr14` (ATR known before `d`), `move_atr` = `c1 / atr14`, `age`. **Disabled by default** (`gold.enabled: false`): stooq returns a non-CSV page to GitHub runners. |
 
 FRED series (public CSV endpoint `fredgraph.csv?id=...`, no key):
 
@@ -85,64 +85,94 @@ There is no reliable free calendar API, so this file is maintained by hand:
 The initial file came from a research pass and is **knowledge-based, not downloaded**: 27 rows
 (2025 shutdown period and 2026) are flagged `uncertain` and should be verified.
 
-## EA report: `client_payload` of `repository_dispatch` (`event_type: "ea_report"`)
+## EA reports: two modes
 
-Top level (8 keys, GitHub allows at most 10):
+The repository is **public**, so `config/settings.json` has `reports.public_mode: true`:
+
+| mode | EA input | schema | accepted here |
+|---|---|---|---|
+| aggregate (default) | `InpGhReportMode=0` | v2, `kind: "ea_agg"` | yes |
+| full detail | `InpGhReportMode=1` | v1, `kind: "ea_report"` | **rejected** (only for a PRIVATE repo with `public_mode: false`) |
+
+Both are sent as `repository_dispatch` with `event_type: "ea_report"`. Note that GitHub shows the event payload of a
+workflow run to anyone who can read the repository, so per-trade data must never be *sent* to a public repo; the
+server-side rejection only keeps it out of the files.
+
+### Aggregate report (v2, `kind: "ea_agg"`): the only format for this public repo
+
+No individual trades: no times, prices, SL/TP, tickets, comments or money amounts. Top level (8 keys, GitHub allows at
+most 10):
 
 | key | meaning |
 |---|---|
-| `v`, `kind` | `1`, `"ea_report"` |
-| `acct` | 16 hex chars: SHA-256 of `salt:login:server`, computed in the EA. A clear login is never sent (the server would hash and drop it, but it would already be visible in the Actions event log). |
-| `rid` | report id `<acct>-<unix>`; all parts of one report share it |
-| `part`, `parts` | chunk number and count (trades are split so each request stays under `InpGhMaxPayloadBytes`) |
-| `ts` | build time, unix seconds UTC |
+| `v`, `kind` | `2`, `"ea_agg"` |
+| `acct` | 16 hex chars: SHA-256 of `salt:login:server`, computed in the EA (a clear login is never sent) |
+| `rid` | `<acct>-<ts>` |
+| `part`, `parts` | always `1`, `1` (an aggregate report is small) |
+| `ts` | unix UTC, **rounded down to the report slot** (`InpGhReportEveryMin`, default 60 min; 15 min for flag and day-end reports) |
 | `data` | see below |
 
-`data`: `ea`, `ver`, `reason` (`periodic`, `dayend`, `flag`, `manual`, `deinit`), `phase` (current EA phase),
-`eq` {`day_pl_pct`, `eq_day_pct`, `float_pct`, `margin_level`}, `mkt` {`sym`, `bid`, `pc` (prev D1 close),
-`d1_open`, `atr` (ATR14 D1), `move`, `move_atr`, `spread`}, `trades[]`, `log[]` (`{t, m}`), `flags[]` (`{key, msg, t}`).
-
-`trades[]` holds one item per **closing deal**:
+`data`:
 
 | key | meaning |
 |---|---|
-| `deal`, `pos` | deal ticket (upsert key), position id (grouping key) |
-| `sym`, `side`, `magic`, `cmt` | symbol, `buy`/`sell` (position side), magic number, entry comment (= method/setup) |
-| `vol`, `vol_in` | volume closed by this deal, total entry volume |
-| `t_in`, `t_out` | entry and exit time, unix UTC |
-| `in`, `out` | entry price, exit price of this deal |
-| `sl`, `tp` | SL/TP **at entry** (R uses this SL) |
-| `r` | `(out - in) / |in - sl|`, signed by side, for this deal |
-| `pl_pct` | net result of this deal (profit + swap + commission + fee) in % of the balance before the deal |
-| `risk_pct` | money at risk at entry (entry to SL, full entry volume) in % of balance |
-| `phase` | EA phase when the position was opened |
-| `reason` | `sl`, `tp`, `so`, `expert`, `client`, `mobile`, `web`, `other` |
-| `mae_r`, `mfe_r` | optional: worst / best excursion while open, in R (tracked by `ZGB_OnTick`) |
+| `ea`, `ver`, `reason` | EA name, bridge version, `periodic` / `dayend` / `flag` / `manual` / `deinit` |
+| `day` | server date of the report (`YYYY-MM-DD`; Exness servers run on UTC) |
+| `phase` | current EA phase name |
+| `eq` | `day_pl_pct` (closed P/L today), `eq_day_pct` (equity vs day start), `float_pct` (open P/L), all % of balance |
+| `mkt` | `sym`, `move_atr` (today's move vs previous D1 close in ATR14(D1) units). No prices. |
+| `periods.day` / `.week` / `.mtd` | aggregate block for today (server day), the rolling last 7 days, month to date |
+| `flags[]` | `{key, msg}` raised by the EA with `ZGB_Flag()` (published: keep prices out of `msg`) |
 
-The server whitelists these keys, drops `balance`, `equity`, `profit`, `pl`, `login`, `account`, `email`, `server`
-and similar keys anywhere, masks token-like strings and truncates long strings.
+Aggregate block (positions that are fully closed, counted at their last exit):
+
+| key | meaning |
+|---|---|
+| `from`, `to` | period dates |
+| `n`, `wins`, `losses`, `be` | closed positions and outcome by sign of the net result |
+| `win_pct` | `wins / (wins + losses)` |
+| `net_r`, `avg_r`, `gross_win_r`, `gross_loss_r`, `pf` | R from the SL at entry (volume-weighted over partial closes); PF = gross win R / gross loss R |
+| `n_r` | positions that had an SL (R defined) |
+| `net_pct` | sum of the positions' net results, % of balance |
+| `max_ls`, `cur_ls`, `lead_ls` | longest losing streak, losing streak at the end, losing streak at the start (lets periods be chained) |
+| `dd_pct` | max peak-to-trough of the cumulative closed P/L % within the period |
+| `rule` | counts: `no_sl`, `risk_cap` (risk > `InpGhRiskCapPct`), `news` (entry within +-`InpGhNewsBlockMin` of NFP/CPI/FOMC), `daily_cap` (days with closed P/L <= -`InpGhDailyCapPct`) |
+| `by_method` | `{"M001": {n, wins, win_pct, net_r}, ...}`: **method codes**, never names (see below) |
+| `by_phase` | same per phase name |
+| `grid` | `mtd` only: `{"Mon": {"08": {n, wins}}}` weekday x 4-hour UTC bucket of the entry; cells with `n < 3` carry the count only |
+| `n_ex`, `mae_r`, `mfe_r` | optional average worst / best excursion in R (positions tracked while open) |
+
+**Method codes.** The EA turns each method name (the entry comment) into `M001`..`M999`, derived from a salted hash and
+recorded in the local file `MQL5\Files\zumi_method_codes.csv` (`code,name`). That file stays on the user's PC and is never
+committed. `M000` = no comment / unknown.
+
+**Validator** (`scripts/agg.py`, whitelist): unknown keys are dropped wherever they appear and their key names (never the
+values) are printed in the workflow log. Specifically it strips `trades`, `log`, prices, times, tickets, comments, absolute
+money and account keys; folds any `by_method` key that is not `M###` into `M000`; drops invalid grid buckets; and removes
+win counts from grid cells with fewer than 3 trades. Tests: `tests/test_agg.py`.
+
+### Detail report (v1, `kind: "ea_report"`): PRIVATE repositories only
+
+Accepted only when `reports.public_mode` is `false`. One item per closing deal in `data.trades[]`: `deal`, `pos`, `sym`,
+`side`, `vol`, `vol_in`, `t_in`, `t_out`, `in`, `out`, `sl`, `tp` (at entry), `r`, `pl_pct`, `risk_pct`, `cmt`, `magic`,
+`phase`, `reason`, `mae_r`, `mfe_r`; plus `log[]` (`{t, m}`), `flags[]` (`{key, msg, t}`), `eq` and a fuller `mkt`.
+Split into parts when larger than `InpGhMaxPayloadBytes`.
 
 ## Stored report files
 
-* `reports/YYYY/MM/DD/<acct>_<YYYYMMDDTHHMMSSZ>[_p<i>of<n>].json`: the sanitised payload, pretty JSON. Re-sending
-  an identical payload writes nothing.
-* `reports/journal/<acct>/deals.jsonl`: one closing deal per line, upserted by `deal` (idempotent).
-* `reports/journal/<acct>/positions.csv`: derived each run from the deals. One row per position: volume-weighted exit
-  over partial closes, `r = sign * (exit_vw - entry) / |entry - sl| * vol_out / vol_in`, `pl_pct` summed, `closed` = all
-  entry volume closed, `n_exits`, `mae_r`/`mfe_r`.
-* `reports/daily/YYYY-MM-DD.md`, `reports/weekly/YYYY-Www.md`, `reports/monthly/YYYY-MM.md`: analytics (see below).
-* `docs/dashboard/data.json`: aggregated data for the static dashboard (`docs/dashboard/index.html`).
+* `reports/YYYY/MM/DD/<acct>_<YYYYMMDDTHHMMSSZ>.json`: the sanitised aggregate report, pretty JSON. Re-sending an
+  identical payload writes nothing.
+* Private detail mode only: `reports/journal/<acct>/deals.jsonl` (deals upserted by ticket) and `positions.csv`
+  (positions rebuilt from deals, partial closes volume-weighted).
+* `reports/daily/YYYY-MM-DD.md`: the `day` block of the last report of that day, plus equity, market move and EA flags.
+* `reports/weekly/YYYY-Www.md`: the `week` block (rolling 7 days) of the last report in that ISO week. Gold does not
+  trade at weekends, so the last report of the week covers Monday to Friday. If no `week` block exists, the daily blocks
+  are merged.
+* `reports/monthly/YYYY-MM.md`: the `mtd` block of the last report in the month (if the EA was offline on the last
+  trading days, the page stops at the last report).
+* `docs/dashboard/data.json` (`aggregates`): per account the daily series, the latest `week` and `mtd`, per-month `mtd`
+  blocks, an all-time merge, and the `mtd` method/phase/grid tables.
 
-## Analytics in the summaries
-
-Per account and period (only closed positions, attributed to the UTC date of the last exit):
-
-* trades, wins / losses / break-even (by sign of `pl_pct`), win % (BE excluded), profit factor (gross win % / gross loss %),
-  expectancy in R and %, sum R, sum %, average win / loss R, max losing streak, losing streak at period end (and across
-  the whole journal);
-* drawdown episodes of the additive closed-P/L % curve (depth >= `rules.dd_episode_min_pct`);
-* breakdown by method (EA comment), by phase, by magic (when more than one);
-* weekday x hour heatmap of entries (weekly / monthly pages);
-* rule engine (`config/settings.json` -> `rules`): `no_sl`, `risk_cap` (risk_pct > cap), `news` (entry within
-  `news_block_before_min` / `after_min` of NFP/CPI/FOMC), `daily_cap`, `weekly_cap`;
-* daily page only: trades table, EA flags, phase/analysis log, last equity and market snapshot.
+Merging (`agg.merge_aggs`, used for fallbacks and the all-time total): counts, R, % and rule counts add up exactly;
+streaks chain through `lead_ls` / `cur_ls`; the merged drawdown is a lower bound (the largest part drawdown or the
+drawdown of the end-of-part P/L path).

@@ -139,8 +139,13 @@ class BuildLatestTest(unittest.TestCase):
         self.assertTrue(res["ok"])
         self.assertIn("DGS2", self.latest()["series"])
         self.assertTrue(any(i["kind"] == "fetch" and i["sid"] == "DGS2" for i in res["issues"]))
+        self.assertEqual(res["message"], "data: quality issues changed: DGS2:fetch")
 
     def test_gold_block_when_available(self):
+        path = self.root / "config/settings.json"
+        cfg = json.loads(path.read_text())
+        cfg["gold"]["enabled"] = True  # disabled by default (stooq blocks GitHub runners)
+        path.write_text(json.dumps(cfg))
         res = build_latest.build(self.root, NOW, session=FakeDataSession(gold_text=fixture_text("stooq_xauusd.csv")))
         self.assertTrue(res["ok"], res["issues"])
         self.assertEqual(self.latest()["gold"]["d"], "2026-11-25")

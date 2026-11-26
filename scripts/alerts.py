@@ -108,11 +108,63 @@ def data_alerts(root: Path, cfg: dict, now: dt.datetime) -> list[dict]:
     return out
 
 
-def ea_alerts(root: Path, cfg: dict, now: dt.datetime) -> list[dict]:
+def agg_alerts(root: Path, cfg: dict, now: dt.datetime) -> list[dict]:
+    """Alerts from aggregate (v2) reports: daily loss, losing streak, drawdown, rule breaks,
+    gold move vs ATR and EA flags. Uses the newest aggregate report of each account."""
     a = cfg["alerts"]
     out: list[dict] = []
     since = now.timestamp() - a["report_max_age_h"] * 3600
-    reps = [r for r in rl.load_reports(root, now.date() - dt.timedelta(days=1), now.date()) if r.get("ts", 0) >= since]
+    reps = [r for r in rl.load_reports(root, now.date() - dt.timedelta(days=1), now.date() + dt.timedelta(days=1))
+            if r.get("kind") == "ea_agg" and r.get("ts", 0) >= since]
+    last: dict[str, dict] = {}
+    for r in reps:
+        last[r["acct"]] = r
+        for fl in r["data"].get("flags", []):
+            msg = fl.get("msg") or fl["key"]
+            out.append(alert(f"eaflag:{r['acct']}:{fl['key']}:{r['data']['day']}", "medium",
+                             f"EA `{r['acct']}` báo: {msg}", f"EA `{r['acct']}` flagged: {msg}"))
+    for acct, r in last.items():
+        d = r["data"]
+        day = d["day"]
+        per = d.get("periods", {})
+        pday, pweek, pmtd = per.get("day") or {}, per.get("week") or {}, per.get("mtd") or {}
+        eq = d.get("eq") or {}
+        vals = [v for v in (eq.get("day_pl_pct"), eq.get("eq_day_pct"), pday.get("net_pct")) if v is not None]
+        if vals and min(vals) <= -a["ea_daily_loss_pct"]:
+            out.append(alert(f"dayloss:{acct}:{day}", "high",
+                             f"EA `{acct}` lỗ trong ngày {min(vals):+.2f}% (ngưỡng -{a['ea_daily_loss_pct']}%)",
+                             f"EA `{acct}` daily loss {min(vals):+.2f}% (threshold -{a['ea_daily_loss_pct']}%)"))
+        streak = max(pday.get("cur_ls", 0) or 0, pweek.get("cur_ls", 0) or 0, pmtd.get("cur_ls", 0) or 0)
+        if streak >= a["losing_streak_n"]:
+            out.append(alert(f"streak:{acct}:{day}:{streak}", "high",
+                             f"EA `{acct}` đang thua {streak} lệnh liên tiếp (ngưỡng {a['losing_streak_n']})",
+                             f"EA `{acct}` is on a losing streak of {streak} trades (threshold {a['losing_streak_n']})"))
+        dd = max(pweek.get("dd_pct") or 0.0, pmtd.get("dd_pct") or 0.0)
+        if dd >= a.get("dd_alert_pct", 5.0):
+            out.append(alert(f"dd:{acct}:{day}", "high",
+                             f"EA `{acct}` drawdown {dd:.2f}% số dư (ngưỡng {a.get('dd_alert_pct', 5.0)}%)",
+                             f"EA `{acct}` drawdown {dd:.2f}% of balance (threshold {a.get('dd_alert_pct', 5.0)}%)"))
+        for rule, count in sorted((pday.get("rule") or {}).items()):
+            if count:
+                out.append(alert(f"rule:{acct}:{day}:{rule}:{count}", "medium",
+                                 f"`{acct}` vi phạm quy tắc `{rule}`: {count} lần hôm nay",
+                                 f"`{acct}` rule break `{rule}`: {count} time(s) today"))
+        mva = (d.get("mkt") or {}).get("move_atr")
+        if mva is not None and abs(mva) >= a["gold_move_atr_k"]:
+            sym = (d.get("mkt") or {}).get("sym", "XAU")
+            out.append(alert(f"gold:{acct}:{day}", "high",
+                             f"{sym} biến động {mva:+.2f} x ATR14(D1) so với giá đóng cửa hôm trước",
+                             f"{sym} moved {mva:+.2f} x ATR14(D1) vs previous close"))
+    return out
+
+
+def ea_alerts(root: Path, cfg: dict, now: dt.datetime) -> list[dict]:
+    """Alerts from per-trade (v1) reports and the deal journal: private detail mode only."""
+    a = cfg["alerts"]
+    out: list[dict] = []
+    since = now.timestamp() - a["report_max_age_h"] * 3600
+    reps = [r for r in rl.load_reports(root, now.date() - dt.timedelta(days=1), now.date())
+            if r.get("ts", 0) >= since and r.get("kind") != "ea_agg"]
     last: dict[str, dict] = {}
     for r in reps:
         last[r["acct"]] = r
@@ -159,7 +211,7 @@ def workflow_alerts(now: dt.datetime) -> list[dict]:
 
 def evaluate(root: Path, cfg: dict, now: dt.datetime) -> list[dict]:
     seen, out = set(), []
-    for al in workflow_alerts(now) + data_alerts(root, cfg, now) + ea_alerts(root, cfg, now):
+    for al in workflow_alerts(now) + data_alerts(root, cfg, now) + agg_alerts(root, cfg, now) + ea_alerts(root, cfg, now):
         if al["key"] not in seen:
             seen.add(al["key"])
             out.append(al)

@@ -28,9 +28,15 @@ All three workflows use only the built-in `GITHUB_TOKEN`, with the smallest perm
 Manual test (Actions tab > reports > Run workflow), payload example:
 
 ```json
-{"v":1,"kind":"ea_report","acct":"0123456789abcdef","rid":"0123456789abcdef-1795600000","part":1,"parts":1,"ts":1795600000,
- "data":{"ea":"Zumi","reason":"manual","eq":{"day_pl_pct":-0.4},"trades":[],"log":[{"t":1795600000,"m":"manual test"}]}}
+{"v":2,"kind":"ea_agg","acct":"0123456789abcdef","ts":1795600800,
+ "data":{"ea":"Zumi","reason":"manual","day":"2026-11-25","eq":{"day_pl_pct":-0.4},
+         "periods":{"day":{"n":2,"wins":1,"losses":1,"be":0,"net_r":0.5,"net_pct":-0.4,"max_ls":1,"cur_ls":1,"lead_ls":0,
+                           "dd_pct":0.9,"rule":{"no_sl":0},"by_method":{"M001":{"n":2,"wins":1,"net_r":0.5}}}}}}
 ```
+
+Per-trade (v1, `kind: "ea_report"`) payloads are rejected while `config/settings.json` has `reports.public_mode: true`
+(the run fails with a short message and the payload is not echoed). Unknown or per-trade keys inside a v2 payload are
+stripped; the log lists their names only.
 
 Or from a shell with the `gh` CLI (logged in with an account or token that can write to the repo), where
 `dispatch.json` is `{"event_type": "ea_report", "client_payload": { ...the object above... }}`:
@@ -52,10 +58,11 @@ gh api repos/<owner>/<repo>/dispatches --input dispatch.json
 |---|---|
 | `vix_jump`, `vix_level` | VIX daily change >= 15 % or >= 3 points; VIX crosses 30 |
 | `real_yield`, `usd` | DFII10 moves >= 12 bp; broad USD moves >= 1 % |
-| `gold:stooq` / `gold:<acct>` | gold daily move >= 1.5 x ATR14 (stooq D-1, or the EA's live market block) |
-| `dayloss` | EA day P/L or equity vs day start <= -3 % |
-| `streak` | >= 4 losing positions in a row (last loss within 48 h) |
-| `rule` | rule-engine breaks in the last 48 h: no SL, risk above cap, entry in a news block, daily/weekly loss cap |
+| `gold:<acct>` / `gold:stooq` | gold daily move >= 1.5 x ATR14 (the EA's `mkt.move_atr`; stooq block when enabled) |
+| `dayloss` | newest aggregate report (< 6 h old): EA day P/L, equity vs day start or the day's closed P/L <= -3 % |
+| `streak` | current losing streak (day / week / month-to-date block) >= 4; a new comment when it grows |
+| `dd` | drawdown of the rolling week or month to date >= `alerts.dd_alert_pct` (5 %) of balance |
+| `rule` | rule-break counts of today's block (no SL, risk above cap, entry in a news block, daily loss cap); a new comment when a count grows. In private detail mode the per-position rule engine is used instead |
 | `eaflag` | flags raised by the EA with `ZGB_Flag()` |
 | `event` | NFP / CPI / FOMC within the next 24 h |
 | `quality`, `stale`, `stale_series`, `no_latest` | data-quality failures, `latest.json` older than 48 h |

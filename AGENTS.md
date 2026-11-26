@@ -11,8 +11,11 @@ Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every
 1. `data/quality.json`: is `ok` true? Any `stale` warnings?
 2. `data/latest.json`: VIX level/change, real yield (`DFII10`), USD (`DTWEXBGS`), `flags`, `events.next` (news in the
    next sessions). Values are as of D-1 or older; check `age`.
-3. `reports/daily/<yesterday UTC>.md` (and today's if it exists): metrics, rule breaks, losing streak, phase log, EA flags.
-4. `reports/weekly/<this ISO week>.md`: method/phase breakdown, weekday x hour heatmap, drawdown episodes.
+3. `reports/daily/<yesterday UTC>.md` (and today's if it exists): aggregate metrics, rule-break counts, losing streak,
+   drawdown, EA flags. Reports are aggregated (no individual trades); methods appear as codes `M###` whose names only the
+   user knows.
+4. `reports/weekly/<this ISO week>.md` and `reports/monthly/<YYYY-MM>.md`: method-code / phase breakdown, weekday x
+   4-hour grid, month-to-date drawdown.
 5. The open PR labelled `zumi-alerts`: alerts posted since the last review.
 6. Write findings for the user. Macro values are context and risk filters only: the macro1 research found no
    out-of-sample edge from them for 1R gold trades. Do not present them as signals.
@@ -24,6 +27,9 @@ Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every
 * Keep the `latest.json` schema backward compatible; bump `v` for breaking changes and update the MQL5 parser.
 * Privacy: never write an account number, email, money amount, token or webhook URL to the repo, a log or a commit
   message. Accounts are hashes; money is % of balance. Use `mask_secrets()` for any free text.
+* The repository is PUBLIC: only aggregate (v2) EA reports are accepted (`reports.public_mode: true`). Do not add
+  per-trade fields, times, prices, tickets or method names to anything published; extend the whitelist in
+  `scripts/agg.py` (and its tests) deliberately.
 * Workflows use only `GITHUB_TOKEN` with minimal `permissions`. Never interpolate `client_payload` (or any event text)
   with `${{ }}` into `run:`; read the event file from Python.
 * The calendar (`data/calendar/events_us.csv`) is maintained by hand; see the data dictionary for the procedure.

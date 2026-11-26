@@ -20,55 +20,76 @@ void OnTradeTransaction(const MqlTradeTransaction &t, const MqlTradeRequest &q, 
   { ZGB_OnTradeTransaction(t); }
 ```
 
-4. Inputs: `InpGhEnable=true`, `InpGhOwner`/`InpGhRepo`, your own `InpGhAccountSalt`, and the token (input
-   `InpGhToken` or first line of `MQL5\Files\zumi_gh_token.txt`). Never put the token in source code or in the repository.
+4. Inputs: `InpGhEnable=true`, `InpGhOwner`/`InpGhRepo`, your own private `InpGhAccountSalt`, the token (input
+   `InpGhToken` or first line of `MQL5\Files\zumi_gh_token.txt`), and **keep `InpGhReportMode=0`** for this public repo.
+   Never put the token in source code or in the repository.
+
+## Report modes
+
+| `InpGhReportMode` | what is sent | use |
+|---|---|---|
+| `0` (default) | **aggregated statistics only** (schema v2 `ea_agg`): for today, the rolling 7 days and month to date: trades, wins, losses, win %, net/avg R, profit factor, max and current losing streak, drawdown % of balance, closed P/L %, rule-break counts, per-method-code and per-phase counts / win % / R, a weekday x 4-hour win % grid (month to date, cells under 3 trades show the count only), optional average MAE/MFE in R; plus equity % (day P/L, equity vs day start, floating) and the gold move in ATR units | public repository |
+| `1` | every closing deal with times, prices, SL/TP, tickets, comment, magic, plus phase/analysis log lines (schema v1) | **ONLY for a PRIVATE repository**. The public repo rejects it, and GitHub would still show the payload in the Actions run, so never use it here |
+
+Method names never leave the PC in mode 0: each entry comment is mapped to a code `M001`..`M999` (salted hash of the
+name, collisions resolved) and the mapping is appended to `MQL5\Files\zumi_method_codes.csv` (`code,name`). Keep that
+file local; it is the only way to read the codes back. An empty comment is `M000`.
+
+**Timing.** In mode 0 a report never leaves when a trade closes. A closing deal marks the current slot
+(`InpGhReportEveryMin`, default 60 min, aligned to the clock); the report is built at the start of the next slot and
+its `ts` is rounded down to that boundary. EA flags go out on the next 15-minute boundary, and the day-end report at
+`InpGhDayEndHour:InpGhDayEndMinute` (rounded to 15 min). So the public timestamps (report time, commit time) only
+reveal "something closed in the previous slot", never a trade time.
 
 ## API
 
 | function | use |
 |---|---|
-| `ZGB_Init()` | load token, compute the account hash, load the cached `latest.json`; disables itself in the Strategy Tester |
+| `ZGB_Init()` | load the token, account hash, cached `latest.json`, method map, remembered events and position extras; disables itself in the Strategy Tester |
 | `ZGB_OnTimer()` | scheduler; **at most one WebRequest per call**: chat message > report queue > `latest.json` refresh |
 | `ZGB_ReadLatest(ZgbLatest &out, bool allow_network=true)` | fills `out`; returns `false` ("no data": disabled / tester / no data / stale / parse) so the EA can trade normally |
 | `ZGB_GetNumber(path, v)`, `ZGB_GetString(path, s)` | any field of the cached JSON, e.g. `"series.T10YIE.c5"`, `"events.next.0.ev"` |
-| `ZGB_SetPhase(s)`, `ZGB_Log(s)` | current phase (stored per position at entry) and phase/analysis log lines (sent with the next report) |
-| `ZGB_Flag(key, msg)` | EA-raised alert: goes into the next report (-> alerts PR comment, within ~5 min) and to Telegram/Discord |
-| `ZGB_SendReport(reason)` | build a report now (it is queued; the queue is flushed by `ZGB_OnTimer`) |
+| `ZGB_SetPhase(s)` | current phase (recorded per position at entry, used for per-phase statistics) |
+| `ZGB_Log(s)` | phase/analysis log line: sent only in mode 1 (in mode 0 it is discarded at each report) |
+| `ZGB_Flag(key, msg)` | EA-raised alert: next report (-> alerts PR comment) and Telegram/Discord. In mode 0 `msg` is published: no prices in it |
+| `ZGB_SendReport(reason)` | build a report now (queued; flushed by `ZGB_OnTimer`). In mode 0 prefer the automatic slots |
 | `ZGB_OnTick()` | tracks min/max price of open positions for MAE/MFE (no network) |
-| `ZGB_OnTradeTransaction(t)` | `DEAL_ADD`: remember the phase at entry, mark a report due on exits |
-| `ZGB_Deinit()` | write pending trades/log lines to the queue (no network in `OnDeinit`) |
+| `ZGB_OnTradeTransaction(t)` | `DEAL_ADD`: remember the phase at entry; a closing deal marks a report as due |
+| `ZGB_Deinit()` | write a pending report to the queue (no network in `OnDeinit`) |
 
 ## Behaviour
 
-* **Timeouts.** `InpGhTimeoutMs` is clamped to 500..5000 ms. WebRequest blocks the EA thread, so the module never
-  runs more than one request per `ZGB_OnTimer` call and never touches the network in `OnTick`.
+* **Statistics source.** Mode 0 recomputes everything from the terminal's deal history at each report (history since
+  the earlier of month start and now - 7 days): positions are grouped by position id, only fully closed positions
+  count, R uses the SL at entry (the opening order's SL if the deal has none) and is volume-weighted over partial
+  closes, % results use the balance just before each exit. Nothing is lost across restarts.
+* **Local files** (`MQL5\Files`, or `Common\Files` with `InpGhUseCommonFiles`), none of them belong in the repo:
+  `zumi_gh_token.txt` (token), `zumi_method_codes.csv` (method map), `zumi_gh_latest.json` (cache),
+  `zumi_gh_events.txt` (NFP/CPI/FOMC times seen in `latest.json`, for the news rule), `zumi_gh_posx.csv` (phase and
+  MAE/MFE of closed positions for 45 days, so month-to-date stats stay stable), `zumi_gh_q_*.json` (send queue).
+* **Rules counted by the EA:** `no_sl`, `risk_cap` (`OrderCalcProfit` from entry to SL > `InpGhRiskCapPct` % of balance),
+  `news` (entry within +-`InpGhNewsBlockMin` minutes of a remembered event; events are known from the time the EA
+  first reads `latest.json`), `daily_cap` (server days with closed P/L <= -`InpGhDailyCapPct` %).
+* **Timeouts.** `InpGhTimeoutMs` is clamped to 500..5000 ms. WebRequest blocks the EA thread, so the module never runs
+  more than one request per `ZGB_OnTimer` call and never touches the network in `OnTick`.
 * **Errors.** `-1` from WebRequest: `4014` (URL not allowed) or `4060` (not allowed in this context) switches the network
   off until restart and prints how to fix it; `5200..5203` (invalid URL, connect failed, timeout, request failed) are
   retried with back-off. HTTP `401/403/404` on dispatch: token problem, retry every 30 min; `400/413/422`: payload rejected
   and dropped; `429/5xx`/offline: exponential back-off up to 60 min.
-* **Bodies.** Converted with `StringToCharArray(body, data, 0, StringLen(body), CP_UTF8)`, so no trailing `\0` is sent
-  (GitHub rejects it as invalid JSON); responses are decoded with `CP_UTF8`.
-* **Reports.** Triggered by closing deals (`OnTradeTransaction`), batched and rate-limited: a periodic report at most every
-  `InpGhReportEveryMin` (30) minutes when something closed, an EA flag report at most every 5 minutes, and one day-end
-  report at `InpGhDayEndHour:InpGhDayEndMinute` server time (always, with the equity snapshot). Deals are found from the
-  history (ticket > last reported ticket, kept in terminal global variables `ZGB_<hash>_ld_k/_ld_t`), so nothing is lost
-  across restarts.
-* **Queue.** Each report part is a file `MQL5\Files\zumi_gh_q_<unix>_<part>_<rnd>.json`; one POST every >= 10 s; deleted
-  on HTTP 204. Capped at 500 files.
-* **Chunking.** `client_payload` may have at most 10 top-level properties (we use 8). GitHub publishes no exact byte
-  limit for it, and large requests are rejected, so each request is kept under `InpGhMaxPayloadBytes` (default 30000):
-  trades are split greedily across parts sharing one `rid`; part 1 also carries the log and flags (log trimmed to fit,
-  newest lines kept).
-* **Values.** `pl_pct` is the deal's net result over the balance just before it; `risk_pct` uses `OrderCalcProfit`
-  from entry to the entry SL; R uses the entry SL (the opening order's SL if the deal has none). No balance, equity or
-  money amount is sent.
-* **Account hash.** `SHA-256(salt + ":" + login + ":" + server)`, first 16 hex chars. With the default salt
-  `change-me` the hash of an 8-digit login can be brute-forced: set your own salt and keep it private.
+* **Bodies.** Converted with `StringToCharArray(body, data, 0, StringLen(body), CP_UTF8)`, so no trailing `\0` is sent;
+  responses are decoded with `CP_UTF8`.
+* **Queue.** Each report is a file `zumi_gh_q_<unix>_<part>_<rnd>.json`; one POST every >= 10 s; deleted on HTTP 204;
+  capped at 500 files.
+* **Payload limits.** `client_payload` may have at most 10 top-level properties (8 are used). GitHub publishes no exact
+  byte limit; an aggregate report is a few KB. Detail reports (mode 1) are split into parts under `InpGhMaxPayloadBytes`.
+* **Account hash.** `SHA-256(salt + ":" + login + ":" + server)`, first 16 hex chars. With the default salt `change-me` the
+  hash of an 8-digit login can be brute-forced: set your own salt and keep it private (it also seeds the method codes).
 * **Strategy Tester.** WebRequest does not work there; `ZGB_Init` disables the module and `ZGB_ReadLatest` returns
   `false` ("tester"). For backtests use `data/history/*.csv` and `data/calendar/events_us.csv` offline.
 
 ## Not compiled here
 
-The module was reviewed statically (and `tests/test_mql5_static.py` lints braces, function definitions, the WebRequest
-signature, char-array conversions and `StringFormat` arity), but it has **not** been compiled in MetaEditor in this
-environment. Compile it once and report any error.
+The module was reviewed statically (`tests/test_mql5_static.py` lints braces, function definitions, the WebRequest
+signature, char-array conversions, `StringFormat` arity, safe defaults, and that the aggregate builder contains no
+per-trade fields), but it has **not** been compiled in MetaEditor in this environment. Compile it once and report any
+error.

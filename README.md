@@ -3,7 +3,8 @@
 Kho này là "bộ não dữ liệu" của EA Zumi (MT5, vàng XAUUSDm trên Exness):
 
 * **(a)** chuẩn bị dữ liệu bên ngoài cho EA đọc: macro FRED, lịch sự kiện Mỹ (NFP/CPI/FOMC), bối cảnh giá vàng (tùy chọn);
-* **(b)** nhận báo cáo lệnh và phân tích do EA gửi về, lưu thành nhật ký giao dịch;
+* **(b)** nhận báo cáo **thống kê tổng hợp** do EA gửi về (repo public: không có từng lệnh, giờ, giá, SL/TP hay ticket;
+  phương pháp chỉ hiện dưới dạng mã `M001`..);
 * **(c)** tạo trang tổng kết ngày/tuần/tháng để Claude đọc và phân tích hằng ngày;
 * **(d)** phát cảnh báo khi có biến động lớn hoặc rủi ro, bằng comment trên một PR "zumi-alerts" mà Claude theo dõi.
 
@@ -13,13 +14,17 @@ Kho này là "bộ não dữ liệu" của EA Zumi (MT5, vàng XAUUSDm trên Exn
 (DGS10, DGS2, DFII10, T10YIE, DTWEXBGS, VIXCLS, DCOILWTICO, SP500), a hand-maintained US event calendar and optional
 stooq gold prices, runs data-quality guards and writes a small, versioned, causal ("value as of D-1")
 `data/latest.json` plus `data/history/*.csv`, committing only when something changed. The EA reads that file through the
-MQL5 include `mql5/ZumiGitHubBridge.mqh` (fail-safe, short timeouts, cached) and sends trade/analysis reports back with
-`repository_dispatch` (`ea_report`). `reports.yml` stores them under `reports/YYYY/MM/DD/` with a hashed account id,
-upserts a deal journal, rebuilds positions (partial closes, R from the entry SL) and renders daily/weekly/monthly
-analytics (win %, profit factor, expectancy, streaks, drawdown episodes, per-method/phase stats, weekday x hour heatmap,
-rule breaks) plus a static dashboard. `alerts.yml` checks VIX jumps, gold moves vs ATR, EA daily loss, losing streaks,
-rule breaks, upcoming NFP/CPI/FOMC and data-quality failures, and comments (Vietnamese + English) on the open PR labelled
-`zumi-alerts`, which Claude subscribes to. Only `GITHUB_TOKEN` is used in workflows; the EA uses a fine-grained PAT
+MQL5 include `mql5/ZumiGitHubBridge.mqh` (fail-safe, short timeouts, cached) and sends reports back with
+`repository_dispatch` (`ea_report`). Because the repository is public, the EA sends **aggregated statistics only**
+(schema v2 `ea_agg`, `InpGhReportMode=0`): for today, the rolling week and month to date it reports trade counts,
+win %, net/avg R, profit factor, losing streaks, drawdown %, closed P/L %, rule-break counts, per-method-code and
+per-phase stats, a coarse weekday x 4-hour grid and average MAE/MFE. There are no individual trades, times, prices, SL/TP
+or tickets; method names become codes `M001`.. whose mapping stays in a local file on the PC; reports leave only at
+clock-aligned slots. A whitelist validator strips anything else and the pipeline rejects per-trade (v1) reports while
+`reports.public_mode` is true. `reports.yml` stores the reports under `reports/YYYY/MM/DD/` with a hashed account id and
+renders daily/weekly/monthly pages plus a static dashboard. `alerts.yml` checks VIX jumps, EA daily loss, losing streaks,
+drawdown, rule breaks, gold moves vs ATR, upcoming NFP/CPI/FOMC and data-quality failures, and comments (Vietnamese +
+English) on the open PR labelled `zumi-alerts`, which Claude subscribes to. Only `GITHUB_TOKEN` is used in workflows; the EA uses a fine-grained PAT
 limited to this repository, kept in an MT5 input or a local file, never in the repo. Start with `AGENTS.md` and `docs/`.
 
 ## Kiến trúc và luồng dữ liệu
@@ -29,7 +34,7 @@ FRED / stooq / lịch sự kiện ──> data.yml (mỗi giờ, phút 17) ─�
                                                                         │
 EA MT5 + ZumiGitHubBridge.mqh <── đọc latest.json (raw hoặc API) ───────┘
       │
-      └─ POST /dispatches (ea_report) ──> reports.yml ──> reports/YYYY/MM/DD/*.json, reports/journal/<hash>/
+      └─ POST /dispatches (thống kê tổng hợp v2) ──> reports.yml ──> reports/YYYY/MM/DD/*.json
                                                           reports/daily|weekly|monthly/*.md, docs/dashboard/
 alerts.yml (sau mỗi lần data/reports chạy) ──> comment trên PR "zumi-alerts" ──> Claude được thông báo
 ```
@@ -45,9 +50,8 @@ Chi tiết: [`docs/architecture.md`](docs/architecture.md), [`docs/workflows.md`
 | `data/history/<ID>.csv` | lịch sử `date,value` (hoặc OHLC cho `XAUUSD.csv`) |
 | `data/quality.json` | kết quả kiểm tra chất lượng (schema, dữ liệu cũ, ngoài khoảng, nhảy bất thường) |
 | `data/calendar/events_us.csv` | lịch NFP/CPI/FOMC, duy trì bằng tay |
-| `reports/YYYY/MM/DD/<hash>_<ts>.json` | báo cáo EA đã làm sạch (không có số tài khoản, không có số tiền) |
-| `reports/journal/<hash>/deals.jsonl`, `positions.csv` | nhật ký deal (upsert theo ticket) và vị thế dựng lại |
-| `reports/daily/YYYY-MM-DD.md`, `weekly/`, `monthly/` | tổng kết: số lệnh, win %, PF, kỳ vọng R, chuỗi thua, drawdown, theo phương pháp/phase, heatmap, vi phạm quy tắc, log phase |
+| `reports/YYYY/MM/DD/<hash>_<ts>.json` | báo cáo thống kê tổng hợp (v2) đã kiểm tra: không có từng lệnh, số tài khoản hay số tiền |
+| `reports/daily/YYYY-MM-DD.md`, `weekly/`, `monthly/` | tổng kết: số lệnh, win %, PF, R ròng/trung bình, chuỗi thua, drawdown %, số lần vi phạm quy tắc, theo mã phương pháp/phase, lưới thứ x khung 4 giờ |
 | `docs/dashboard/index.html` + `data.json` | dashboard tĩnh (dùng được với GitHub Pages) |
 | `config/settings.json` | mọi ngưỡng: chuỗi FRED, kiểm tra chất lượng, quy tắc, cảnh báo |
 
@@ -76,6 +80,7 @@ Hãy dùng chúng như bối cảnh và bộ lọc rủi ro (chặn giờ tin, c
 6. **EA:** chép `mql5/ZumiGitHubBridge.mqh` vào thư mục EA, `#include` nó và gọi các hàm như trong
    `mql5/ZumiGitHubBridge_Demo.mq5`. Đặt `InpGhEnable=true`, `InpGhOwner`/`InpGhRepo`, một `InpGhAccountSalt` riêng
    (giữ bí mật), và token: input `InpGhToken` hoặc dòng đầu của file `MQL5\Files\zumi_gh_token.txt`.
+   **Giữ `InpGhReportMode=0`** (thống kê tổng hợp) vì repo này public.
 7. **Kiểm tra báo cáo:** *Actions > reports > Run workflow* với payload mẫu trong `docs/workflows.md`, hoặc để EA chạy
    và chờ báo cáo cuối ngày. *Actions > alerts > Run workflow* với `dry_run` để xem cảnh báo.
 8. **Claude:** đăng ký theo dõi PR có nhãn `zumi-alerts`; mỗi comment là một thông báo.
@@ -99,8 +104,24 @@ python scripts/alerts.py --dry-run           # in ra các cảnh báo
 * Workflow chỉ dùng `GITHUB_TOKEN` với quyền tối thiểu (`contents: write`; thêm `pull-requests`/`issues: write` cho
   alerts). `client_payload` là dữ liệu không tin cậy: chỉ đọc từ file sự kiện bằng Python, không chèn `${{ }}` vào shell.
 * **Quyền riêng tư:** tài khoản chỉ xuất hiện dưới dạng hash SHA-256 có salt (tính ngay trong EA, không gửi số tài khoản);
-  tiền chỉ ở dạng % số dư và R; server còn loại bỏ các khóa như `balance`, `equity`, `profit`, `login`, `email`.
-  Đổi `InpGhAccountSalt` khỏi giá trị mặc định, nếu không hash của số tài khoản 8 chữ số có thể bị dò ngược.
+  tiền chỉ ở dạng % số dư và R. Đổi `InpGhAccountSalt` khỏi giá trị mặc định, nếu không hash của số tài khoản
+  8 chữ số có thể bị dò ngược.
+
+## Hai chế độ báo cáo (repo này public: chỉ dùng chế độ 0)
+
+| `InpGhReportMode` | nội dung gửi đi | dùng khi |
+|---|---|---|
+| `0` (mặc định) | **chỉ thống kê tổng hợp** (schema v2 `ea_agg`) cho hôm nay, 7 ngày gần nhất và từ đầu tháng: số lệnh, thắng/thua, win %, R ròng và trung bình, profit factor, chuỗi thua dài nhất và hiện tại, drawdown % số dư, lãi/lỗ đã chốt %, số lần vi phạm quy tắc (không SL, rủi ro vượt mức, vào lệnh trong giờ tin, vượt giới hạn lỗ ngày), thống kê theo mã phương pháp và theo phase, lưới win % theo thứ x khung 4 giờ (ô dưới 3 lệnh chỉ hiện số lượng), MAE/MFE trung bình (R) | repo **public** (repo này) |
+| `1` | từng lệnh: giờ, giá, SL/TP, ticket, comment, magic, log phân tích (schema v1) | **CHỈ cho repo PRIVATE**. Repo public từ chối loại này, và GitHub vẫn hiển thị payload trong trang Actions, nên tuyệt đối không dùng ở đây |
+
+* **Mã phương pháp:** tên phương pháp (comment lúc vào lệnh) được đổi thành mã `M001`..`M999` (hash có salt). Bảng
+  đối chiếu chỉ nằm trong file `MQL5\Files\zumi_method_codes.csv` trên máy bạn, **không bao giờ commit**. `M000` = không
+  có comment.
+* **Không lộ thời điểm lệnh:** báo cáo chỉ được gửi ở đầu mỗi "khung" (`InpGhReportEveryMin`, mặc định 60 phút, canh
+  theo đồng hồ), với dấu thời gian làm tròn về đầu khung; cờ cảnh báo của EA đi theo khung 15 phút.
+* **Bộ kiểm tra phía server** (`scripts/agg.py`): chỉ giữ các khóa trong danh sách cho phép; loại bỏ `trades`, `log`, giá,
+  giờ, ticket, comment, số tiền, khóa tài khoản; gộp mọi tên phương pháp không phải dạng `M###` vào `M000`; workflow log
+  chỉ in tên các khóa bị loại, không in giá trị. Báo cáo chi tiết (v1) bị từ chối khi `reports.public_mode` là `true`.
 
 ## Public hay private?
 
@@ -128,7 +149,7 @@ của Fed; đánh dấu `uncertain` cho tới khi xác nhận. File ban đầu �
 ## Giới hạn hiện tại
 
 * Module MQL5 mới được rà soát tĩnh (có test lint), **chưa biên dịch bằng MetaEditor**.
-* Nguồn vàng stooq chưa kiểm chứng được từ môi trường build (bị chặn); khối `gold` là tùy chọn và tự bỏ qua khi lỗi.
+* Nguồn vàng stooq trả về trang không phải CSV cho máy chạy GitHub Actions, nên khối `gold` đang **tắt** (`gold.enabled: false`).
 * CFTC COT không dùng (bị Cloudflare chặn).
 
 ## Tham khảo / References
@@ -150,8 +171,8 @@ Các mẫu thiết kế được học từ những dự án sau (liên kết th
 * Nhật ký giao dịch: TradingJournal, aether, [LuxAlgo/trade-journal](https://github.com/LuxAlgo/trade-journal),
   [pengfuchao/trading-record-analysis](https://github.com/pengfuchao/trading-record-analysis), HxTradeHelper.
   Đã áp dụng: dựng vị thế từ deal theo `position_id` (kể cả đóng từng phần, giá thoát bình quân theo khối lượng), upsert
-  idempotent, win %/PF/kỳ vọng/R theo SL lúc vào lệnh, chuỗi thua, giai đoạn drawdown, thống kê theo phương pháp/phase,
-  heatmap thứ x giờ, bộ quy tắc (giới hạn lỗ ngày/tuần, lệnh không SL, rủi ro vượt mức, vào lệnh trong giờ tin), MAE/MFE
-  tùy chọn, dashboard tĩnh.
+  idempotent (chế độ private), win %/PF/kỳ vọng/R theo SL lúc vào lệnh, chuỗi thua, drawdown, thống kê theo phương
+  pháp/phase, heatmap thứ x giờ, bộ quy tắc (giới hạn lỗ ngày/tuần, lệnh không SL, rủi ro vượt mức, vào lệnh trong giờ
+  tin), MAE/MFE tùy chọn, dashboard tĩnh. Ở repo public các chỉ số này được EA tính sẵn và chỉ gửi dạng tổng hợp.
 * Quyền riêng tư và bảo mật theo các dự án trên: hash tài khoản, tiền theo % số dư, không commit bí mật, che bí mật
   trong log và commit message.

@@ -33,15 +33,17 @@
 <body>
 <main>
   <h1>Zumi trade journal</h1>
-  <p class="note">Generated from <code>data.json</code> by <code>scripts/daily_summary.py</code>. Money in % of balance only; R uses the stop-loss at entry; account shown as a hash.</p>
+  <p class="note">Generated from <code>data.json</code> by <code>scripts/daily_summary.py</code>. Aggregated statistics only: no individual trades, times or prices. Money in % of balance; R uses the stop-loss at entry; methods as codes; account shown as a hash. Cards and tables show month to date.</p>
   <label>Account <select id="acct"></select></label>
   <div class="cards" id="cards"></div>
-  <h2>Cumulative closed P/L (%) and R</h2>
+  <h2>Cumulative closed P/L (%) and R, by day</h2>
   <div class="chart"><svg id="curve" role="img" aria-label="Cumulative P/L chart"></svg></div>
-  <h2>By method</h2>
+  <h2>By method code</h2>
   <div class="wrap"><table id="method"></table></div>
   <h2>By phase</h2>
   <div class="wrap"><table id="phase"></table></div>
+  <h2>Weekday x 4-hour bucket (UTC entry): n / win% (hidden when n &lt; 3)</h2>
+  <div class="wrap"><table id="grid"></table></div>
   <h2>Daily</h2>
   <div class="wrap"><table id="daily"></table></div>
 </main>
@@ -60,19 +62,15 @@ function table(node, head, rows) {
   const tr = el("tr"); head.forEach(h => tr.appendChild(el("th", {}, h))); node.appendChild(tr);
   rows.forEach(r => { const row = el("tr"); r.forEach(c => { const td = el("td", c.cls ? { class: c.cls } : {}, c.t ?? c); row.appendChild(td); }); node.appendChild(row); });
 }
-function groupRows(groups) {
-  return Object.entries(groups || {}).map(([k, m]) => [k, String(m.n), fmt(m.win_pct, 1), fmt(m.pf),
-    { t: fmt(m.sum_r, 2, true), cls: cls(m.sum_r) }, { t: fmt(m.sum_pct, 3, true), cls: cls(m.sum_pct) }]);
-}
-function curve(svg, positions) {
+function curve(svg, steps) {
+  // steps: [{pl, r}] in chronological order
   svg.replaceChildren();
   const W = svg.clientWidth || 800, H = 220, P = 28;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  if (!positions.length) { svg.appendChild(el("text", { svg: 1, x: P, y: H / 2, fill: "currentColor" }, "No closed trades yet")); return; }
+  if (!steps.length) { svg.appendChild(el("text", { svg: 1, x: P, y: H / 2, fill: "currentColor" }, "No closed trades yet")); return; }
   let cp = 0, cr = 0; const a = [0], b = [0];
-  positions.forEach(p => { cp += p.pl || 0; cr += p.r || 0; a.push(cp); b.push(cr); });
-  const series = [[a, "var(--accent)", "%"], [b, "var(--muted)", "R"]];
-  series.forEach(([vals, color, label], idx) => {
+  steps.forEach(p => { cp += p.pl || 0; cr += p.r || 0; a.push(cp); b.push(cr); });
+  [[a, "var(--accent)", "%"], [b, "var(--muted)", "R"]].forEach(([vals, color, label], idx) => {
     const lo = Math.min(...vals, 0), hi = Math.max(...vals, 0), span = (hi - lo) || 1;
     const x = i => P + i * (W - 2 * P) / Math.max(1, vals.length - 1);
     const y = v => H - P - (v - lo) * (H - 2 * P) / span;
@@ -83,28 +81,53 @@ function curve(svg, positions) {
     svg.appendChild(el("text", { svg: 1, x: W - P + 2, y: y(last) + 4, fill: color, "font-size": 12 }, `${fmt(last, 2, true)}${label}`));
   });
 }
-function render(data, acct) {
-  const a = data.accounts[acct]; if (!a) return;
-  const m = a.metrics;
-  const cards = [["Trades", m.n], ["Win %", fmt(m.win_pct, 1)], ["Profit factor", fmt(m.pf)], ["Expectancy R", fmt(m.exp_r, 3, true)],
-    ["Sum R", fmt(m.sum_r, 2, true)], ["Sum %", fmt(m.sum_pct, 2, true)], ["Max L-streak", m.max_loss_streak], ["L-streak now", m.end_loss_streak]];
+function cards(list) {
   const box = document.getElementById("cards"); box.replaceChildren();
-  cards.forEach(([k, v]) => { const c = el("div", { class: "card" }); c.appendChild(el("div", { class: "k" }, k)); c.appendChild(el("div", { class: "v" }, String(v))); box.appendChild(c); });
-  curve(document.getElementById("curve"), a.positions);
-  const head = ["key", "n", "win %", "PF", "sum R", "sum %"];
-  table(document.getElementById("method"), head, groupRows(a.by_method));
-  table(document.getElementById("phase"), head, groupRows(a.by_phase));
+  list.forEach(([k, v]) => { const c = el("div", { class: "card" }); c.appendChild(el("div", { class: "k" }, k)); c.appendChild(el("div", { class: "v" }, String(v))); box.appendChild(c); });
+}
+const HEAD = ["key", "n", "win %", "net R"];
+const groupRows = groups => Object.entries(groups || {}).sort((x, y) => (y[1].n || 0) - (x[1].n || 0))
+  .map(([k, g]) => [k, String(g.n), fmt(g.win_pct, 1), { t: fmt(g.net_r, 2, true), cls: cls(g.net_r) }]);
+const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], BK = ["00", "04", "08", "12", "16", "20"];
+function renderAgg(a) {
+  const m = a.mtd || {};
+  cards([["As of", a.as_of], ["Trades (MTD)", m.n ?? 0], ["Win %", fmt(m.win_pct, 1)], ["Profit factor", fmt(m.pf)],
+    ["Net R", fmt(m.net_r, 2, true)], ["Net %", fmt(m.net_pct, 2, true)], ["DD %", fmt(m.dd_pct, 2)],
+    ["Max L-streak", m.max_ls ?? 0], ["L-streak now", m.cur_ls ?? 0], ["All-time net R", fmt((a.all || {}).net_r, 2, true)]]);
+  const days = Object.entries(a.daily || {}).sort();
+  curve(document.getElementById("curve"), days.map(([, x]) => ({ pl: x.net_pct, r: x.net_r })));
+  table(document.getElementById("method"), HEAD, groupRows(a.by_method));
+  table(document.getElementById("phase"), HEAD, groupRows(a.by_phase));
+  table(document.getElementById("grid"), ["day"].concat(BK),
+    WD.filter(w => a.grid && a.grid[w]).map(w => [w].concat(BK.map(b => {
+      const c = a.grid[w][b]; return c ? (c.win_pct !== undefined ? `${c.n} / ${fmt(c.win_pct, 0)}` : String(c.n)) : "";
+    }))));
+  table(document.getElementById("daily"), ["day", "trades", "win %", "net R", "net %", "DD %"],
+    days.reverse().slice(0, 60).map(([d, x]) => [d, String(x.n), fmt(x.win_pct, 1), { t: fmt(x.net_r, 2, true), cls: cls(x.net_r) },
+      { t: fmt(x.net_pct, 3, true), cls: cls(x.net_pct) }, fmt(x.dd_pct, 2)]));
+}
+function renderDetail(a) {   // private repositories in detail mode only
+  const m = a.metrics;
+  cards([["Trades", m.n], ["Win %", fmt(m.win_pct, 1)], ["Profit factor", fmt(m.pf)], ["Expectancy R", fmt(m.exp_r, 3, true)],
+    ["Sum R", fmt(m.sum_r, 2, true)], ["Sum %", fmt(m.sum_pct, 2, true)], ["Max L-streak", m.max_loss_streak], ["L-streak now", m.end_loss_streak]]);
+  curve(document.getElementById("curve"), a.positions.map(p => ({ pl: p.pl, r: p.r })));
+  const rows = g => Object.entries(g || {}).map(([k, x]) => [k, String(x.n), fmt(x.win_pct, 1), { t: fmt(x.sum_r, 2, true), cls: cls(x.sum_r) }]);
+  table(document.getElementById("method"), HEAD, rows(a.by_method));
+  table(document.getElementById("phase"), HEAD, rows(a.by_phase));
+  table(document.getElementById("grid"), ["-"], []);
   const days = Object.entries(a.daily).sort().reverse().slice(0, 60);
-  table(document.getElementById("daily"), ["day (UTC)", "trades", "R", "P/L %"],
+  table(document.getElementById("daily"), ["day", "trades", "R", "P/L %"],
     days.map(([d, x]) => [d, String(x.n), { t: fmt(x.r, 2, true), cls: cls(x.r) }, { t: fmt(x.pl_pct, 3, true), cls: cls(x.pl_pct) }]));
 }
 fetch("data.json", { cache: "no-store" }).then(r => r.json()).then(data => {
   const sel = document.getElementById("acct");
-  const accts = Object.keys(data.accounts || {});
+  const agg = data.aggregates || {}, det = data.accounts || {};
+  const accts = [...new Set(Object.keys(agg).concat(Object.keys(det)))].sort();
   accts.forEach(k => sel.appendChild(el("option", { value: k }, k)));
   if (!accts.length) { document.getElementById("cards").textContent = "No EA reports yet."; return; }
-  sel.addEventListener("change", () => render(data, sel.value));
-  render(data, accts[0]);
+  const show = k => agg[k] ? renderAgg(agg[k]) : renderDetail(det[k]);
+  sel.addEventListener("change", () => show(sel.value));
+  show(accts[0]);
 }).catch(() => { document.getElementById("cards").textContent = "data.json not found (no EA reports yet)."; });
 </script>
 </body>

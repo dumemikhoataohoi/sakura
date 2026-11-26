@@ -167,7 +167,9 @@ def build(root: Path, now: dt.datetime, session=None, offline: bool = False) -> 
         if stable_part(old_latest) != stable_part(latest):
             write_text_atomic(latest_path, dumps_pretty(latest))
             written = True
-    write_quality(root, now, ok, issues)
+    if write_quality(root, now, ok, issues) and not written and ok:
+        kinds = sorted({f"{i['sid']}:{i['kind']}" for i in issues}) or ["cleared"]
+        message = "data: quality issues changed: " + ", ".join(kinds[:8])
     return {"latest": latest if ok else None, "issues": issues, "written": written, "message": message, "ok": ok}
 
 

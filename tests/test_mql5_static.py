@@ -123,6 +123,18 @@ class Mql5StaticTest(unittest.TestCase):
 
     def test_safe_defaults(self):
         self.assertRegex(self.mqh, r"input bool\s+InpGhEnable\s+= false;")
+        self.assertRegex(self.mqh, r"input int\s+InpGhReportMode\s+= 0;")   # aggregate by default (public repo)
+        self.assertIn('"kind\\":\\"ea_agg\\"', self.mqh)
+
+    def test_aggregate_payload_has_no_per_trade_fields(self):
+        start = self.mqh.index("string ZGB_AggJson(")
+        end = self.mqh.index("string ZGB_LogJson(")
+        block = self.mqh[start:end]   # aggregation + aggregate report builder
+        for key in ("\\\"deal\\\"", "\\\"pos\\\"", "\\\"t_in\\\"", "\\\"t_out\\\"", "\\\"in\\\"", "\\\"out\\\"",
+                    "\\\"sl\\\"", "\\\"tp\\\"", "\\\"cmt\\\"", "\\\"log\\\"", "\\\"trades\\\""):
+            self.assertNotIn(key, block)
+        self.assertIn("ZGB_MarketJson(false)", block)
+        self.assertIn("ZGB_EquityJson(false)", block)
         self.assertRegex(self.mqh, r'input string InpGhToken\s+= "";')
         self.assertRegex(self.mqh, r"input bool\s+InpTgEnable\s+= false;")
         self.assertRegex(self.mqh, r"input bool\s+InpDcEnable\s+= false;")

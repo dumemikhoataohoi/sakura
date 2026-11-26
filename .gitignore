@@ -19,6 +19,9 @@ config/local*.json
 # MT5 local files (cache, queue, state) if someone copies them into the repo
 zumi_gh_*.json
 zumi_gh_*.txt
+zumi_gh_*.csv
+# local method-name -> code map: must stay on the user's PC
+zumi_method_codes*.csv
 *.ex5
 *.ex4
 *.log

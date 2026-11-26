@@ -1,5 +1,6 @@
 {
   "accounts": {},
+  "aggregates": {},
   "schema": "zumi.dashboard",
-  "v": 1
+  "v": 2
 }

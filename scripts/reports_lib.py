@@ -79,19 +79,49 @@ def _strip_forbidden(obj):
     return obj
 
 
+def _acct_of(payload: dict) -> str:
+    acct = str(payload.get("acct", "")).lower()
+    clear = next((payload[k] for k in ("login", "account", "account_number") if payload.get(k)), None)
+    if not HASH_RE.match(acct):
+        acct = account_hash(str(clear)) if clear else "unknown"
+    return acct[:16]
+
+
+def is_per_trade(payload: dict) -> bool:
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    return payload.get("kind", "ea_report") == "ea_report" or bool(data.get("trades"))
+
+
+def sanitize_any(payload: dict, rcfg: dict, now: dt.datetime) -> tuple[dict, list[str]]:
+    """Entry point. v2 aggregates ('ea_agg') are always accepted (whitelist-validated).
+    v1 per-trade reports ('ea_report') are REJECTED while reports.public_mode is true."""
+    import agg
+    if not isinstance(payload, dict):
+        raise PayloadError("payload must be an object")
+    kind = payload.get("kind")
+    if kind == "ea_agg" or (kind is None and payload.get("v") == 2):
+        try:
+            return agg.sanitize_v2(payload, rcfg, now, _acct_of(payload))
+        except agg.AggError as exc:
+            raise PayloadError(str(exc)) from None
+    if kind not in (None, "ea_report"):
+        raise PayloadError(f"unsupported kind {kind!r}")
+    if rcfg.get("public_mode", True):
+        raise PayloadError("per-trade report (v1 'ea_report') rejected: the repository is public. "
+                           "Use aggregate reports (EA input InpGhReportMode=0), or set "
+                           "reports.public_mode=false only for a PRIVATE repository")
+    return sanitize(payload, rcfg, now), []
+
+
 def sanitize(payload: dict, rcfg: dict, now: dt.datetime) -> dict:
+    """v1 per-trade report (detail mode, private repositories only)."""
     if not isinstance(payload, dict):
         raise PayloadError("payload must be an object")
     kind = payload.get("kind", "ea_report")
     if kind != "ea_report":
         raise PayloadError(f"unsupported kind {kind!r}")
     max_len = int(rcfg.get("max_str_len", 400))
-
-    acct = str(payload.get("acct", "")).lower()
-    clear = next((payload[k] for k in ("login", "account", "account_number") if payload.get(k)), None)
-    if not HASH_RE.match(acct):
-        acct = account_hash(str(clear)) if clear else "unknown"
-    acct = acct[:16]
+    acct = _acct_of(payload)
 
     ts = _num(payload.get("ts"), int) or int(now.timestamp())
     # Reject timestamps far in the future / past (clock bugs) by clamping to "now".

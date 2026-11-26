@@ -28,16 +28,19 @@ from zumi_common import UTC, load_config, mask_secrets, repo_root, set_github_ou
 def store(root: Path, payload: dict, now: dt.datetime | None = None) -> dict:
     now = now or utc_now()
     cfg = load_config(root)
-    rep = rl.sanitize(payload, cfg.get("reports", {}), now)
+    rep, stripped = rl.sanitize_any(payload, cfg.get("reports", {}), now)
     path = rl.store_raw(root, rep)
-    rl.upsert_deals(root, rep["acct"], rep["data"]["trades"])
     dates = {dt.datetime.fromtimestamp(rep["ts"], UTC).date()}
-    for t in rep["data"]["trades"]:
-        if t.get("t_out"):
-            dates.add(dt.datetime.fromtimestamp(t["t_out"], UTC).date())
-    for item in rep["data"]["log"]:
-        dates.add(dt.datetime.fromtimestamp(item["t"], UTC).date())
-    return {"path": path, "report": rep, "dates": sorted(dates)}
+    if rep["kind"] == "ea_agg":
+        dates.add(dt.date.fromisoformat(rep["data"]["day"]))
+    else:
+        rl.upsert_deals(root, rep["acct"], rep["data"]["trades"])
+        for t in rep["data"]["trades"]:
+            if t.get("t_out"):
+                dates.add(dt.datetime.fromtimestamp(t["t_out"], UTC).date())
+        for item in rep["data"]["log"]:
+            dates.add(dt.datetime.fromtimestamp(item["t"], UTC).date())
+    return {"path": path, "report": rep, "dates": sorted(dates), "stripped": stripped}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -65,15 +68,29 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: rejected payload: {exc}", file=sys.stderr)
         return 1
     rep = res["report"]
-    print(f"stored {res['path'].relative_to(root)} acct={rep['acct']} part={rep['part']}/{rep['parts']} "
-          f"trades={len(rep['data']['trades'])} log={len(rep['data']['log'])}")
+    if res["stripped"]:
+        # key names only, never values
+        print(f"warning: stripped non-aggregate / unknown keys: {', '.join(res['stripped'][:40])}")
+    if rep["kind"] == "ea_agg":
+        day = rep["data"]["periods"].get("day", {})
+        print(f"stored {res['path'].relative_to(root)} acct={rep['acct']} aggregate day={rep['data']['day']} "
+              f"n={day.get('n', 0)}")
+    else:
+        print(f"stored {res['path'].relative_to(root)} acct={rep['acct']} part={rep['part']}/{rep['parts']} "
+              f"trades={len(rep['data']['trades'])} log={len(rep['data']['log'])}")
     if args.dates_out:
         Path(args.dates_out).write_text("".join(d.isoformat() + "\n" for d in res["dates"]), encoding="utf-8")
     if args.msg_out:
-        pl = [t["pl_pct"] for t in rep["data"]["trades"] if t.get("pl_pct") is not None]
-        msg = (f"reports: {rep['acct']} part {rep['part']}/{rep['parts']}, {len(rep['data']['trades'])} deal(s)"
-               + (f" {sum(pl):+.2f}%" if pl else "") + f", {len(rep['data']['log'])} log line(s), "
-               + " ".join(d.isoformat() for d in res["dates"]))
+        if rep["kind"] == "ea_agg":
+            day = rep["data"]["periods"].get("day", {})
+            msg = (f"reports: {rep['acct']} aggregate {rep['data']['day']} ({rep['data'].get('reason', '-')}): "
+                   f"day {day.get('n', 0)} trade(s), net R {day.get('net_r', 0) or 0:+.2f}, "
+                   f"net {day.get('net_pct', 0) or 0:+.2f}%")
+        else:
+            pl = [t["pl_pct"] for t in rep["data"]["trades"] if t.get("pl_pct") is not None]
+            msg = (f"reports: {rep['acct']} part {rep['part']}/{rep['parts']}, {len(rep['data']['trades'])} deal(s)"
+                   + (f" {sum(pl):+.2f}%" if pl else "") + f", {len(rep['data']['log'])} log line(s), "
+                   + " ".join(d.isoformat() for d in res["dates"]))
         Path(args.msg_out).write_text(mask_secrets(msg) + "\n", encoding="utf-8")
     set_github_output("acct", rep["acct"])
     set_github_output("dates", " ".join(d.isoformat() for d in res["dates"]))
