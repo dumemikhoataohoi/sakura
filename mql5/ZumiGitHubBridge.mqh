@@ -60,6 +60,10 @@
 #define ZUMI_GITHUB_BRIDGE_MQH
 
 #define ZGB_VERSION "2.1"
+#define ZGB_CTL_CACHE   "zumi_gh_control.json"
+#define ZGB_CTL_STALE_S (72 * 3600)
+#define ZGB_CTL_MAX_TTL (7 * 86400)
+#define ZGB_CTL_MAXMULT 2.0
 
 input group "=== Zumi GitHub bridge ==="
 input bool   InpGhEnable          = false;               // Enable the GitHub bridge
@@ -834,10 +838,7 @@ bool ZGB_GetString(const string path, string &v)  { return(StringLen(g_zgbLatest
 //+------------------------------------------------------------------+
 //| CONTROL CHANNEL: control/control.json (schema v1)                |
 //+------------------------------------------------------------------+
-#define ZGB_CTL_CACHE   "zumi_gh_control.json"
-#define ZGB_CTL_STALE_S (72 * 3600)
-#define ZGB_CTL_MAX_TTL (7 * 86400)
-#define ZGB_CTL_MAXMULT 2.0
+// (control-channel #defines moved to the top of the file)
 
 bool     g_zgbCtlValid   = false;   // a valid file is loaded (it may still be expired / stale at query time)
 long     g_zgbCtlSeq     = 0;
