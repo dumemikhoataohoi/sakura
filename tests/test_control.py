@@ -130,7 +130,9 @@ class SeqAndChangelogTest(unittest.TestCase):
     def setUp(self):
         self.root = make_root()
         (self.root / "control").mkdir()
-        shutil.copy(REPO / "control" / "control.json", self.root / "control" / "control.json")
+        # Seed with a fixed neutral file, not the live control.json (that one changes with every directive).
+        seed, _, _ = control.normalize(base(seq=1))
+        (self.root / "control" / "control.json").write_text(json.dumps(seed, indent=2, sort_keys=True) + "\n")
         if not shutil.which("git"):
             self.skipTest("git not available")
         for args in (["init", "-q", "-b", "main"], ["add", "."],
