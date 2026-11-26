@@ -1,5 +1,12 @@
 {
-  "issues": [],
+  "issues": [
+    {
+      "kind": "fetch",
+      "level": "warn",
+      "msg": "XAUUSD: fetch failed: stooq: unexpected response (not CSV)",
+      "sid": "XAUUSD"
+    }
+  ],
   "ok": true,
-  "since_utc": "2026-11-26T11:50:40Z"
+  "since_utc": "2026-11-26T12:09:45Z"
 }
