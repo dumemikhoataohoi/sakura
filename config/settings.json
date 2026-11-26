@@ -133,5 +133,30 @@
     "report_max_age_h": 6,
     "rule_break_lookback_h": 48,
     "dd_alert_pct": 5.0
+  },
+  "coordinator": {
+    "_doc": "Pre-registered rules for scripts/coordinator_report.py. Claude reads the suggestion and decides.",
+    "report_max_age_h": 36,
+    "directive_hours": 48,
+    "streak_pause_n": 4,
+    "winrate_pause_pct": 35.0,
+    "winrate_min_trades": 10,
+    "dd_reduce_pct": 5.0,
+    "dd_reduce_mult": 0.5,
+    "vix_high_mult": 1.0,
+    "boost_min_trades": 15,
+    "boost_min_winpct": 60.0,
+    "boost_min_avg_r": 0.3,
+    "boost_mult": 1.25,
+    "recover_winpct": 50.0,
+    "enable_codes": {},
+    "news_events": [
+      "NFP",
+      "CPI",
+      "FOMC"
+    ],
+    "news_lookahead_h": 72,
+    "news_before_min": 30,
+    "news_after_min": 30
   }
 }

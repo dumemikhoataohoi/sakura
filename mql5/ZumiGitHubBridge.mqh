@@ -12,6 +12,15 @@
 //|   InpGhReportMode = 1: full per-trade detail (schema v1) - ONLY  |
 //|     for a PRIVATE repo (a public repo rejects it).               |
 //|  OPTIONAL instant channels: Telegram bot, Discord webhook (off)  |
+//|  CONTROL (off by default, InpGhControlEnable): reads             |
+//|  control/control.json hourly -> ZGB_RiskMult / ZGB_MethodPaused /|
+//|  ZGB_MethodEnabled / ZGB_ExtraNewsBlock / ZGB_NewsAllowed.       |
+//|  HARD LIMITS stay in the EA: multipliers are clamped to          |
+//|  InpGhMaxRiskMult (default 1.0 = never increase); the EA's max   |
+//|  risk per trade, daily/weekly loss stops and crisis layer are    |
+//|  never overridable; no remote open/close; no SL/TP changes;      |
+//|  missing/invalid/expired/stale (>72 h) control = NEUTRAL;        |
+//|  Strategy Tester = NEUTRAL.                                      |
 //|                                                                  |
 //|  SETUP (MT5 > Tools > Options > Expert Advisors >                |
 //|         "Allow WebRequest for listed URL"), add:                 |
@@ -50,7 +59,7 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.0"
+#define ZGB_VERSION "2.1"
 
 input group "=== Zumi GitHub bridge ==="
 input bool   InpGhEnable          = false;               // Enable the GitHub bridge
@@ -80,6 +89,13 @@ input string InpGhSymbolFilter    = "";                  // Report only this sym
 input string InpGhMarketSymbol    = "";                  // Symbol for market context ("" = chart)
 input int    InpGhMaxPayloadBytes = 30000;               // Max bytes per dispatch request
 input bool   InpGhUseCommonFiles  = false;               // Cache/queue in Common\Files
+input group "=== Control channel (Claude coordination, default off) ==="
+input bool   InpGhControlEnable     = false;             // Apply directives from control/control.json
+input string InpGhControlPath       = "control/control.json"; // Path of the control file in the repo
+input int    InpGhControlEveryMin   = 60;                // Re-download the control file every N minutes
+input double InpGhMaxRiskMult       = 1.0;               // HARD cap of remote risk multipliers (1.0 = never increase, max 2.0)
+input bool   InpGhAllowEnable       = false;             // Allow mode "on" to enable methods that are off by default
+input bool   InpGhAllowNewsOverride = false;             // Allow "allow" windows to lift the EA's own news veto
 input group "=== Optional instant channels (default off) ==="
 input bool   InpTgEnable          = false;               // Telegram: send EA flags / alerts
 input string InpTgBotToken        = "";                  // Telegram bot token
@@ -676,6 +692,14 @@ bool ZGB_Init(void)
    ZGB_MapLoad();
    ZGB_EventsLoad();
    ZGB_PosxLoad();
+   if(InpGhControlEnable)
+     {
+      string ctl, err;
+      if(ZGB_ReadFile(ZGB_CTL_CACHE, ctl) && !ZGB_CtlApplyText(ctl, false, err)) ZGB_CtlClear();
+      PrintFormat("ZumiGitHubBridge control: enabled, risk cap x%.2f, enable %s, news override %s",
+                  ZGB_Clamp(InpGhMaxRiskMult, 0.0, ZGB_CTL_MAXMULT), InpGhAllowEnable ? "allowed" : "off",
+                  InpGhAllowNewsOverride ? "allowed" : "off");
+     }
    if(StringLen(g_zgbLatest) > 0) ZGB_EventsRemember(g_zgbLatest);
    if(InpGhReportMode != 0)
       Print("ZumiGitHubBridge: WARNING InpGhReportMode=1 sends every trade (times, prices, SL/TP). Use it ONLY with a PRIVATE repository.");
@@ -806,6 +830,363 @@ bool ZGB_ReadLatest(ZgbLatest &out, const bool allow_network = true)
 // Generic accessors on the cached latest.json, e.g. ZGB_GetNumber("series.T10YIE.c5", v)
 bool ZGB_GetNumber(const string path, double &v)  { return(StringLen(g_zgbLatest) > 0 && ZGB_JNumber(g_zgbLatest, path, v)); }
 bool ZGB_GetString(const string path, string &v)  { return(StringLen(g_zgbLatest) > 0 && ZGB_JString(g_zgbLatest, path, v)); }
+
+//+------------------------------------------------------------------+
+//| CONTROL CHANNEL: control/control.json (schema v1)                |
+//+------------------------------------------------------------------+
+#define ZGB_CTL_CACHE   "zumi_gh_control.json"
+#define ZGB_CTL_STALE_S (72 * 3600)
+#define ZGB_CTL_MAX_TTL (7 * 86400)
+#define ZGB_CTL_MAXMULT 2.0
+
+bool     g_zgbCtlValid   = false;   // a valid file is loaded (it may still be expired / stale at query time)
+long     g_zgbCtlSeq     = 0;
+long     g_zgbCtlUpdated = 0;       // unix UTC
+datetime g_zgbCtlNextRead = 0;
+bool     g_zgbCtlWasActive = false;
+double   g_zgbCtlGMult   = 1.0;
+bool     g_zgbCtlPauseAll = false;
+long     g_zgbCtlGExp    = 0;
+string   g_zgbCtlGReason = "";
+string   g_zgbCtlCode[];
+string   g_zgbCtlMode[];
+double   g_zgbCtlMult[];
+string   g_zgbCtlPhases[];          // ",A,B," ("" = every phase)
+long     g_zgbCtlExp[];
+string   g_zgbCtlReason[];
+string   g_zgbCtlWKind[];
+long     g_zgbCtlWStart[];
+long     g_zgbCtlWEnd[];
+string   g_zgbCtlWReason[];
+
+// keys of the object at path ("methods"), in file order
+int ZGB_JKeys(const string &s, const string path, string &keys[])
+  {
+   ArrayResize(keys, 0);
+   int i = ZGB_JPath(s, path);
+   int n = StringLen(s);
+   if(i < 0 || i >= n || StringGetCharacter(s, i) != '{') return(0);
+   i++;
+   while(i < n)
+     {
+      i = ZGB_JWs(s, i);
+      if(i >= n || StringGetCharacter(s, i) != '"') break;
+      int ke = ZGB_JSkipStr(s, i);
+      if(ke < 0) break;
+      int k = ArraySize(keys);
+      ArrayResize(keys, k + 1);
+      keys[k] = StringSubstr(s, i + 1, ke - i - 2);
+      i = ZGB_JWs(s, ke);
+      if(i >= n || StringGetCharacter(s, i) != ':') break;
+      i = ZGB_JSkipVal(s, i + 1);
+      if(i < 0) break;
+      i = ZGB_JWs(s, i);
+      if(i < n && StringGetCharacter(s, i) == ',') { i++; continue; }
+      break;
+     }
+   return(ArraySize(keys));
+  }
+
+long ZGB_IsoToUnix(const string iso)   // "2026-11-28T12:30:16Z" -> unix seconds (UTC)
+  {
+   if(StringLen(iso) < 19) return(0);
+   string t = StringSubstr(iso, 0, 19);
+   StringReplace(t, "-", ".");
+   StringReplace(t, "T", " ");
+   return((long)StringToTime(t));
+  }
+
+long ZGB_JTime(const string &s, const string base)   // reads base_unix, falls back to base_utc
+  {
+   double v;
+   if(ZGB_JNumber(s, base + "_unix", v) && v > 0) return((long)v);
+   string iso;
+   if(ZGB_JString(s, base + "_utc", iso)) return(ZGB_IsoToUnix(iso));
+   return(0);
+  }
+
+bool ZGB_IsMethodCode(const string c)
+  {
+   if(StringLen(c) != 4 || StringGetCharacter(c, 0) != 'M') return(false);
+   for(int i = 1; i < 4; i++) { ushort ch = StringGetCharacter(c, i); if(ch < '0' || ch > '9') return(false); }
+   return(true);
+  }
+
+bool ZGB_IsReason(const string c)
+  {
+   return(StringLen(c) == 3 && StringGetCharacter(c, 0) == 'R' && StringGetCharacter(c, 1) >= '0' &&
+          StringGetCharacter(c, 1) <= '9' && StringGetCharacter(c, 2) >= '0' && StringGetCharacter(c, 2) <= '9');
+  }
+
+double ZGB_Clamp(const double v, const double lo, const double hi) { return(MathMax(lo, MathMin(hi, v))); }
+
+void ZGB_CtlClear(void)
+  {
+   g_zgbCtlValid = false;
+   g_zgbCtlGMult = 1.0; g_zgbCtlPauseAll = false; g_zgbCtlGExp = 0; g_zgbCtlGReason = "";
+   ArrayResize(g_zgbCtlCode, 0); ArrayResize(g_zgbCtlMode, 0); ArrayResize(g_zgbCtlMult, 0);
+   ArrayResize(g_zgbCtlPhases, 0); ArrayResize(g_zgbCtlExp, 0); ArrayResize(g_zgbCtlReason, 0);
+   ArrayResize(g_zgbCtlWKind, 0); ArrayResize(g_zgbCtlWStart, 0); ArrayResize(g_zgbCtlWEnd, 0); ArrayResize(g_zgbCtlWReason, 0);
+  }
+
+// Full local validation + clamping. Returns false (with err) on any problem: the caller applies NEUTRAL.
+bool ZGB_CtlApplyText(const string &s, const bool save, string &err)
+  {
+   err = "";
+   double v, seq;
+   string author;
+   if(!ZGB_JNumber(s, "v", v) || (int)v != 1) { err = "version"; return(false); }
+   if(!ZGB_JString(s, "author", author) || author != "claude") { err = "author"; return(false); }
+   if(!ZGB_JNumber(s, "seq", seq) || seq < 1) { err = "seq"; return(false); }
+   long upd = ZGB_JTime(s, "updated");
+   long now = (long)TimeGMT();
+   if(upd <= 0 || upd > now + 600) { err = "updated_utc"; return(false); }
+   if(g_zgbCtlValid && (long)seq < g_zgbCtlSeq) { err = "older seq (ignored, keeping the current file)"; return(true); }
+   if(g_zgbCtlValid && (long)seq == g_zgbCtlSeq && upd == g_zgbCtlUpdated) return(true);   // unchanged
+   // ---- global
+   double gm = 1.0, pa = 0;
+   if(ZGB_JNumber(s, "global.risk_mult", v)) gm = ZGB_Clamp(v, 0.0, ZGB_CTL_MAXMULT);
+   ZGB_JNumber(s, "global.pause_all", pa);
+   long gexp = ZGB_JTime(s, "global.expires");
+   if(gexp <= 0) gexp = upd + 48 * 3600;
+   if(gexp <= upd) { err = "global.expires"; return(false); }
+   if(gexp > upd + ZGB_CTL_MAX_TTL) gexp = upd + ZGB_CTL_MAX_TTL;
+   string greason = "R00";
+   ZGB_JString(s, "global.reason_code", greason);
+   if(!ZGB_IsReason(greason)) { err = "global.reason_code"; return(false); }
+   // ---- methods
+   string codes[];
+   int nm = ZGB_JKeys(s, "methods", codes);
+   if(nm > 100) { err = "too many methods"; return(false); }
+   string mmode[], mph[], mrs[];
+   double mmul[];
+   long mexp[];
+   ArrayResize(mmode, nm); ArrayResize(mph, nm); ArrayResize(mrs, nm); ArrayResize(mmul, nm); ArrayResize(mexp, nm);
+   for(int k = 0; k < nm; k++)
+     {
+      string b = "methods." + codes[k];
+      if(!ZGB_IsMethodCode(codes[k])) { err = "method key is not a code"; return(false); }
+      string mode_s = "";   // temporaries: array elements are not passed by reference
+      if(!ZGB_JString(s, b + ".mode", mode_s)) { err = b + ".mode"; return(false); }
+      mmode[k] = mode_s;
+      double m = 1.0;
+      ZGB_JNumber(s, b + ".risk_mult", m);
+      m = ZGB_Clamp(m, 0.0, ZGB_CTL_MAXMULT);
+      if(mmode[k] == "pause") m = 0.0;
+      else if(mmode[k] == "on") m = 1.0;
+      else if(mmode[k] == "reduce") { if(m >= 1.0) { err = b + " reduce needs < 1"; return(false); } }
+      else if(mmode[k] == "boost") { if(m <= 1.0) { err = b + " boost needs > 1"; return(false); } }
+      else { err = b + ".mode"; return(false); }
+      mmul[k] = m;
+      mexp[k] = ZGB_JTime(s, b + ".expires");
+      if(mexp[k] <= 0) mexp[k] = upd + 48 * 3600;
+      if(mexp[k] <= upd) { err = b + ".expires"; return(false); }
+      if(mexp[k] > upd + ZGB_CTL_MAX_TTL) mexp[k] = upd + ZGB_CTL_MAX_TTL;
+      string rc_s = "";
+      if(!ZGB_JString(s, b + ".reason_code", rc_s) || !ZGB_IsReason(rc_s)) { err = b + ".reason_code"; return(false); }
+      mrs[k] = rc_s;
+      mph[k] = "";
+      for(int q = 0; q < 10; q++)
+        {
+         string ph;
+         if(!ZGB_JString(s, b + ".phases." + IntegerToString(q), ph)) break;
+         mph[k] += (StringLen(mph[k]) == 0 ? "," : "") + ph + ",";
+        }
+     }
+   // ---- news windows
+   string wk[], wr[];
+   long ws[], we[];
+   int nw = 0;
+   for(int q = 0; q < 51; q++)
+     {
+      string b = "news_blocks." + IntegerToString(q);
+      string kind;
+      if(!ZGB_JString(s, b + ".kind", kind)) break;
+      if(q == 50) { err = "too many news windows"; return(false); }
+      long st = ZGB_JTime(s, b + ".start"), en = ZGB_JTime(s, b + ".end");
+      string rc = "";
+      ZGB_JString(s, b + ".reason_code", rc);
+      if((kind != "block" && kind != "allow") || st <= 0 || en <= st || !ZGB_IsReason(rc)) { err = b; return(false); }
+      if(en - st > (kind == "allow" ? 4 * 3600 : 24 * 3600) || en > upd + ZGB_CTL_MAX_TTL) { err = b + " too long"; return(false); }
+      ArrayResize(wk, nw + 1); ArrayResize(wr, nw + 1); ArrayResize(ws, nw + 1); ArrayResize(we, nw + 1);
+      wk[nw] = kind; wr[nw] = rc; ws[nw] = st; we[nw] = en;
+      nw++;
+     }
+   // ---- valid: log the differences with reason codes, then commit
+   PrintFormat("ZumiGitHubBridge control: applying seq %I64d (updated %s UTC)", (long)seq, TimeToString((datetime)upd, TIME_DATE | TIME_MINUTES));
+   if(gm != g_zgbCtlGMult || (pa != 0) != g_zgbCtlPauseAll || !g_zgbCtlValid)
+      PrintFormat("ZumiGitHubBridge control: global risk_mult %.2f (cap %.2f) pause_all %s until %s UTC (%s)", gm,
+                  ZGB_Clamp(InpGhMaxRiskMult, 0.0, ZGB_CTL_MAXMULT), pa != 0 ? "true" : "false",
+                  TimeToString((datetime)gexp, TIME_DATE | TIME_MINUTES), greason);
+   for(int k = 0; k < nm; k++)
+     {
+      int old = -1;
+      for(int q = 0; q < ArraySize(g_zgbCtlCode); q++) if(g_zgbCtlCode[q] == codes[k]) { old = q; break; }
+      if(old < 0 || g_zgbCtlMode[old] != mmode[k] || g_zgbCtlMult[old] != mmul[k] || g_zgbCtlPhases[old] != mph[k] || g_zgbCtlExp[old] != mexp[k])
+         PrintFormat("ZumiGitHubBridge control: %s %s x%.2f phases[%s] until %s UTC (%s)", codes[k], mmode[k], mmul[k],
+                     mph[k], TimeToString((datetime)mexp[k], TIME_DATE | TIME_MINUTES), mrs[k]);
+     }
+   for(int q = 0; q < ArraySize(g_zgbCtlCode); q++)
+     {
+      bool kept = false;
+      for(int k = 0; k < nm; k++) if(codes[k] == g_zgbCtlCode[q]) { kept = true; break; }
+      if(!kept) PrintFormat("ZumiGitHubBridge control: %s directive removed (EA default)", g_zgbCtlCode[q]);
+     }
+   for(int q = 0; q < nw; q++)
+      PrintFormat("ZumiGitHubBridge control: news %s %s .. %s UTC (%s)", wk[q], TimeToString((datetime)ws[q], TIME_DATE | TIME_MINUTES),
+                  TimeToString((datetime)we[q], TIME_DATE | TIME_MINUTES), wr[q]);
+   ZGB_CtlClear();
+   g_zgbCtlSeq = (long)seq; g_zgbCtlUpdated = upd;
+   g_zgbCtlGMult = gm; g_zgbCtlPauseAll = (pa != 0); g_zgbCtlGExp = gexp; g_zgbCtlGReason = greason;
+   ArrayResize(g_zgbCtlCode, nm); ArrayResize(g_zgbCtlMode, nm); ArrayResize(g_zgbCtlMult, nm);
+   ArrayResize(g_zgbCtlPhases, nm); ArrayResize(g_zgbCtlExp, nm); ArrayResize(g_zgbCtlReason, nm);
+   for(int k = 0; k < nm; k++)
+     {
+      g_zgbCtlCode[k] = codes[k]; g_zgbCtlMode[k] = mmode[k]; g_zgbCtlMult[k] = mmul[k];
+      g_zgbCtlPhases[k] = mph[k]; g_zgbCtlExp[k] = mexp[k]; g_zgbCtlReason[k] = mrs[k];
+     }
+   ArrayResize(g_zgbCtlWKind, nw); ArrayResize(g_zgbCtlWStart, nw); ArrayResize(g_zgbCtlWEnd, nw); ArrayResize(g_zgbCtlWReason, nw);
+   for(int q = 0; q < nw; q++) { g_zgbCtlWKind[q] = wk[q]; g_zgbCtlWStart[q] = ws[q]; g_zgbCtlWEnd[q] = we[q]; g_zgbCtlWReason[q] = wr[q]; }
+   g_zgbCtlValid = true;
+   if(save) ZGB_WriteFile(ZGB_CTL_CACHE, s);
+   return(true);
+  }
+
+// true while a valid, fresh control file is loaded and the channel is enabled (never in the tester)
+bool ZGB_CtlActive(void)
+  {
+   if(!InpGhEnable || !InpGhControlEnable || MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_OPTIMIZATION)) return(false);
+   if(!g_zgbCtlValid) return(false);
+   return((long)TimeGMT() - g_zgbCtlUpdated <= ZGB_CTL_STALE_S);
+  }
+
+// Fetch (at most every InpGhControlEveryMin) and apply control.json. Returns true when directives are active.
+bool ZGB_ReadControl(const bool allow_network = true)
+  {
+   if(!InpGhEnable || !InpGhControlEnable || MQLInfoInteger(MQL_TESTER)) return(false);
+   datetime now = TimeGMT();
+   if(allow_network && g_zgbNetOk && now >= g_zgbCtlNextRead)
+     {
+      string url, headers, body;
+      if(InpGhPrivateRepo)
+        {
+         url = InpGhApiBase + "/repos/" + InpGhOwner + "/" + InpGhRepo + "/contents/" + InpGhControlPath + "?ref=" + InpGhBranch;
+         headers = ZGB_GhHeaders(true, "application/vnd.github.raw+json");
+        }
+      else
+        {
+         url = InpGhRawBase + "/" + InpGhOwner + "/" + InpGhRepo + "/" + InpGhBranch + "/" + InpGhControlPath;
+         headers = "User-Agent: zumi-ea-bridge\r\n";
+        }
+      int code = ZGB_Http("GET", url, headers, "", body);
+      if(code != -2)
+        {
+         g_zgbCtlNextRead = now + (int)MathMax(5, InpGhControlEveryMin) * 60;
+         if(code == 200)
+           {
+            string err;
+            if(!ZGB_CtlApplyText(body, true, err))
+              {
+               if(g_zgbCtlValid || g_zgbCtlWasActive)
+                  PrintFormat("ZumiGitHubBridge control: INVALID file (%s) -> NEUTRAL", err);
+               ZGB_CtlClear();
+              }
+            else if(StringLen(err) > 0) Print("ZumiGitHubBridge control: " + err);
+           }
+         else if(code == 404)
+           {
+            if(g_zgbCtlValid) Print("ZumiGitHubBridge control: file missing (HTTP 404) -> NEUTRAL");
+            ZGB_CtlClear();
+           }
+         else g_zgbCtlNextRead = now + 15 * 60;   // network problem: keep the last good file (it still expires)
+        }
+     }
+   bool active = ZGB_CtlActive();
+   if(g_zgbCtlWasActive && !active) Print("ZumiGitHubBridge control: no longer active (expired / stale / disabled) -> NEUTRAL");
+   g_zgbCtlWasActive = active;
+   return(active);
+  }
+
+int ZGB_CtlFind(const string code)
+  {
+   for(int i = 0; i < ArraySize(g_zgbCtlCode); i++) if(g_zgbCtlCode[i] == code) return(i);
+   return(-1);
+  }
+
+// index of the method directive that applies now to (method, phase), or -1
+int ZGB_CtlDirective(const string method_name, const string phase_label)
+  {
+   if(!ZGB_CtlActive()) return(-1);
+   int k = ZGB_CtlFind(ZGB_MethodCode(method_name));
+   if(k < 0 || (long)TimeGMT() >= g_zgbCtlExp[k]) return(-1);
+   if(StringLen(g_zgbCtlPhases[k]) > 0 && StringFind(g_zgbCtlPhases[k], "," + phase_label + ",") < 0) return(-1);
+   return(k);
+  }
+
+bool ZGB_CtlGlobalActive(void) { return(ZGB_CtlActive() && (long)TimeGMT() < g_zgbCtlGExp); }
+
+// Risk multiplier for a method in a phase: global x method, clamped to [0, InpGhMaxRiskMult] (and never above 2.0).
+double ZGB_RiskMult(const string method_name, const string phase_label)
+  {
+   if(!ZGB_CtlActive()) return(1.0);
+   double m = 1.0;
+   if(ZGB_CtlGlobalActive())
+     {
+      if(g_zgbCtlPauseAll) return(0.0);
+      m = g_zgbCtlGMult;
+     }
+   int k = ZGB_CtlDirective(method_name, phase_label);
+   if(k >= 0)
+     {
+      if(g_zgbCtlMode[k] == "pause") return(0.0);
+      m *= g_zgbCtlMult[k];
+     }
+   double cap = ZGB_Clamp(InpGhMaxRiskMult, 0.0, ZGB_CTL_MAXMULT);
+   return(ZGB_Clamp(m, 0.0, cap));
+  }
+
+// Base risk x multiplier, never above the EA's own max risk per trade (that cap is not overridable).
+double ZGB_ApplyRisk(const double base_risk_pct, const double max_risk_pct, const string method_name, const string phase_label)
+  {
+   return(MathMin(base_risk_pct * ZGB_RiskMult(method_name, phase_label), max_risk_pct));
+  }
+
+bool ZGB_MethodPaused(const string method_name, const string phase_label)
+  {
+   if(!ZGB_CtlActive()) return(false);
+   if(ZGB_CtlGlobalActive() && g_zgbCtlPauseAll) return(true);
+   int k = ZGB_CtlDirective(method_name, phase_label);
+   return(k >= 0 && g_zgbCtlMode[k] == "pause");
+  }
+
+// Should the method run? enabled_by_default = the EA's own setting. "on" can enable an off-by-default
+// method only when InpGhAllowEnable is true. A pause always wins.
+bool ZGB_MethodEnabled(const string method_name, const string phase_label, const bool enabled_by_default)
+  {
+   if(ZGB_MethodPaused(method_name, phase_label)) return(false);
+   if(enabled_by_default) return(true);
+   int k = ZGB_CtlDirective(method_name, phase_label);
+   return(InpGhAllowEnable && k >= 0 && g_zgbCtlMode[k] == "on");
+  }
+
+// Extra news block from the control file. t_utc = TimeGMT()-based time. Can only ADD blocking.
+bool ZGB_ExtraNewsBlock(const datetime t_utc)
+  {
+   if(!ZGB_CtlActive()) return(false);
+   for(int i = 0; i < ArraySize(g_zgbCtlWKind); i++)
+      if(g_zgbCtlWKind[i] == "block" && (long)t_utc >= g_zgbCtlWStart[i] && (long)t_utc < g_zgbCtlWEnd[i]) return(true);
+   return(false);
+  }
+
+// "allow" window: may lift the EA's OWN news veto for that event, only with InpGhAllowNewsOverride.
+// Never lifts the crisis layer or the loss stops; an extra block always wins over an allow.
+bool ZGB_NewsAllowed(const datetime t_utc)
+  {
+   if(!ZGB_CtlActive() || !InpGhAllowNewsOverride || ZGB_ExtraNewsBlock(t_utc)) return(false);
+   for(int i = 0; i < ArraySize(g_zgbCtlWKind); i++)
+      if(g_zgbCtlWKind[i] == "allow" && (long)t_utc >= g_zgbCtlWStart[i] && (long)t_utc < g_zgbCtlWEnd[i]) return(true);
+   return(false);
+  }
 
 //+------------------------------------------------------------------+
 //| EA-side logging / flags / phase                                  |
@@ -1359,27 +1740,36 @@ int ZGB_LoadPositions(const datetime from, ZgbPos &ps[])
 
 int ZGB_Outcome(const double pl) { return(pl > 0 ? 1 : (pl < 0 ? -1 : 0)); }
 
-void ZGB_GroupAdd(string &keys[], int &kn[], int &kw[], double &kr[], const string key, const bool win, const double r)
+// ko[] keeps the outcome sequence of each group ("W", "L", "B"), oldest first, for streak / last-20 stats
+void ZGB_GroupAdd(string &keys[], int &kn[], int &kw[], double &kr[], string &ko[], const string key, const int oc, const double r)
   {
    int i = 0, n = ArraySize(keys);
    for(; i < n; i++) if(keys[i] == key) break;
    if(i == n)
      {
-      ArrayResize(keys, n + 1); ArrayResize(kn, n + 1); ArrayResize(kw, n + 1); ArrayResize(kr, n + 1);
-      keys[n] = key; kn[n] = 0; kw[n] = 0; kr[n] = 0;
+      ArrayResize(keys, n + 1); ArrayResize(kn, n + 1); ArrayResize(kw, n + 1); ArrayResize(kr, n + 1); ArrayResize(ko, n + 1);
+      keys[n] = key; kn[n] = 0; kw[n] = 0; kr[n] = 0; ko[n] = "";
      }
    kn[i]++;
-   if(win) kw[i]++;
+   if(oc > 0) kw[i]++;
    kr[i] += r;
+   ko[i] += (oc > 0 ? "W" : (oc < 0 ? "L" : "B"));
+   if(StringLen(ko[i]) > 40) ko[i] = StringSubstr(ko[i], StringLen(ko[i]) - 20);
   }
 
-string ZGB_GroupJson(string &keys[], int &kn[], int &kw[], double &kr[])
+string ZGB_GroupJson(string &keys[], int &kn[], int &kw[], double &kr[], string &ko[])
   {
    string out = "";
    for(int i = 0; i < ArraySize(keys); i++)
-      out += (i > 0 ? "," : "") + StringFormat("\"%s\":{\"n\":%d,\"wins\":%d,\"win_pct\":%s,\"net_r\":%s}",
+     {
+      int len = StringLen(ko[i]), cur = 0, l20 = 0, l20w = 0;
+      for(int j = len - 1; j >= 0 && StringGetCharacter(ko[i], j) == 'L'; j--) cur++;
+      for(int j = (int)MathMax(0, len - 20); j < len; j++) { l20++; if(StringGetCharacter(ko[i], j) == 'W') l20w++; }
+      out += (i > 0 ? "," : "") + StringFormat("\"%s\":{\"n\":%d,\"wins\":%d,\"win_pct\":%s,\"net_r\":%s,\"cur_ls\":%d,\"l20_n\":%d,\"l20_wins\":%d}",
                                                 ZGB_Esc(keys[i]), kn[i], kw[i],
-                                                ZGB_Num(kn[i] > 0 ? 100.0 * kw[i] / kn[i] : EMPTY_VALUE, 1), ZGB_Num(kr[i], 3));
+                                                ZGB_Num(kn[i] > 0 ? 100.0 * kw[i] / kn[i] : EMPTY_VALUE, 1), ZGB_Num(kr[i], 3),
+                                                cur, l20, l20w);
+     }
    return("{" + out + "}");
   }
 
@@ -1410,9 +1800,9 @@ string ZGB_AggJson(ZgbPos &ps[], const datetime from, const bool with_grid)
    int no_sl = 0, risk_cap = 0, news = 0, daily_cap = 0;
    bool lead_open = true;
    double net_r = 0, gw = 0, gl = 0, net_pct = 0, cum = 0, peak = 0, dd = 0, mae = 0, mfe = 0;
-   string mk[], pk[], dk[];
-   int mn[], mw[], pn[], pw[];
-   double mr[], pr[], dv[];
+   string mk[], pk[], dk[], xk[], mo[], po[], xo[];
+   int mn[], mw[], pn[], pw[], xn[], xw[];
+   double mr[], pr[], dv[], xr[];
    int gn[42], gw2[42];
    ArrayInitialize(gn, 0);
    ArrayInitialize(gw2, 0);
@@ -1432,8 +1822,10 @@ string ZGB_AggJson(ZgbPos &ps[], const datetime from, const bool with_grid)
       if(ps[i].risk_over) risk_cap++;
       if(ps[i].news) news++;
       if(ps[i].has_ex) { n_ex++; mae += ps[i].mae; mfe += ps[i].mfe; }
-      ZGB_GroupAdd(mk, mn, mw, mr, ps[i].mcode, oc > 0, ps[i].has_r ? ps[i].r : 0);
-      ZGB_GroupAdd(pk, pn, pw, pr, ps[i].phase, oc > 0, ps[i].has_r ? ps[i].r : 0);
+      double rr = ps[i].has_r ? ps[i].r : 0;
+      ZGB_GroupAdd(mk, mn, mw, mr, mo, ps[i].mcode, oc, rr);
+      ZGB_GroupAdd(pk, pn, pw, pr, po, ps[i].phase, oc, rr);
+      ZGB_GroupAdd(xk, xn, xw, xr, xo, ps[i].mcode + ":" + ps[i].phase, oc, rr);
       // daily cap: closed P/L per server day
       string day = ZGB_Date(ps[i].t_out);
       int di = 0, nd = ArraySize(dk);
@@ -1472,13 +1864,15 @@ string ZGB_AggJson(ZgbPos &ps[], const datetime from, const bool with_grid)
       "{\"from\":\"%s\",\"to\":\"%s\",\"n\":%d,\"wins\":%d,\"losses\":%d,\"be\":%d,\"win_pct\":%s,\"net_r\":%s,"
       "\"avg_r\":%s,\"gross_win_r\":%s,\"gross_loss_r\":%s,\"pf\":%s,\"net_pct\":%s,\"max_ls\":%d,\"cur_ls\":%d,"
       "\"lead_ls\":%d,\"dd_pct\":%s,\"n_r\":%d,\"n_ex\":%d,\"mae_r\":%s,\"mfe_r\":%s,"
-      "\"rule\":{\"no_sl\":%d,\"risk_cap\":%d,\"news\":%d,\"daily_cap\":%d},\"by_method\":%s,\"by_phase\":%s%s}",
+      "\"rule\":{\"no_sl\":%d,\"risk_cap\":%d,\"news\":%d,\"daily_cap\":%d},\"by_method\":%s,\"by_phase\":%s,"
+      "\"by_method_phase\":%s%s}",
       ZGB_IsoDate(from), ZGB_IsoDate(TimeTradeServer()), n, wins, losses, be,
       ZGB_Num(wins + losses > 0 ? 100.0 * wins / (wins + losses) : EMPTY_VALUE, 1), ZGB_Num(net_r, 3),
       ZGB_Num(n > 0 ? net_r / n : EMPTY_VALUE, 3), ZGB_Num(gw, 3), ZGB_Num(gl, 3),
       ZGB_Num(gl > 0 ? gw / gl : EMPTY_VALUE, 2), ZGB_Num(net_pct, 3), max_ls, cur_ls, lead_ls, ZGB_Num(dd, 3),
       n_r, n_ex, ZGB_Num(n_ex > 0 ? mae / n_ex : EMPTY_VALUE, 3), ZGB_Num(n_ex > 0 ? mfe / n_ex : EMPTY_VALUE, 3),
-      no_sl, risk_cap, news, daily_cap, ZGB_GroupJson(mk, mn, mw, mr), ZGB_GroupJson(pk, pn, pw, pr), grid);
+      no_sl, risk_cap, news, daily_cap, ZGB_GroupJson(mk, mn, mw, mr, mo), ZGB_GroupJson(pk, pn, pw, pr, po),
+      ZGB_GroupJson(xk, xn, xw, xr, xo), grid);
    return(out);
   }
 
@@ -1493,16 +1887,18 @@ bool ZGB_BuildAggReport(const string reason, const long round_sec)
    t.day = 1;
    datetime month0 = StructToTime(t);
    datetime week0 = now_srv - 7 * 86400;
+   datetime r30 = now_srv - 30 * 86400;
    ZgbPos ps[];
-   ZGB_LoadPositions((datetime)MathMin((long)week0, (long)month0), ps);
+   ZGB_LoadPositions((datetime)MathMin((long)r30, (long)month0), ps);
    long ts = (long)TimeGMT();
    if(round_sec > 0) ts -= ts % round_sec;
    string rid = g_zgbAcct + "-" + IntegerToString(ts);
    string data = StringFormat("{\"ea\":\"Zumi\",\"ver\":\"%s\",\"reason\":\"%s\",\"day\":\"%s\",\"phase\":\"%s\","
-                              "\"eq\":%s,\"mkt\":%s,\"periods\":{\"day\":%s,\"week\":%s,\"mtd\":%s},\"flags\":%s}",
+                              "\"eq\":%s,\"mkt\":%s,\"periods\":{\"day\":%s,\"week\":%s,\"mtd\":%s,\"r30\":%s},\"flags\":%s}",
                               ZGB_VERSION, ZGB_Esc(reason), ZGB_IsoDate(now_srv), ZGB_Esc(g_zgbPhase),
                               ZGB_EquityJson(false), ZGB_MarketJson(false),
                               ZGB_AggJson(ps, day0, false), ZGB_AggJson(ps, week0, false), ZGB_AggJson(ps, month0, true),
+                              ZGB_AggJson(ps, r30, false),
                               ZGB_FlagsJson());
    string body = StringFormat("{\"event_type\":\"ea_report\",\"client_payload\":{\"v\":2,\"kind\":\"ea_agg\",\"acct\":\"%s\","
                               "\"rid\":\"%s\",\"part\":1,\"parts\":1,\"ts\":%I64d,\"data\":%s}}", g_zgbAcct, rid, ts, data);
@@ -1773,6 +2169,7 @@ void ZGB_OnTimer(void)
    if(g_zgbBudget > 0) ZGB_FlushNotify();
    if(g_zgbBudget > 0) ZGB_FlushQueue();
    if(g_zgbBudget > 0 && now >= g_zgbNextRead) ZGB_FetchLatest();
+   if(InpGhControlEnable) ZGB_ReadControl(g_zgbBudget > 0);
    g_zgbInTimer = false;
   }
 

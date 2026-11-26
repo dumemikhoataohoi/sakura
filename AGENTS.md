@@ -17,7 +17,15 @@ Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every
 4. `reports/weekly/<this ISO week>.md` and `reports/monthly/<YYYY-MM>.md`: method-code / phase breakdown, weekday x
    4-hour grid, month-to-date drawdown.
 5. The open PR labelled `zumi-alerts`: alerts posted since the last review.
-6. Write findings for the user. Macro values are context and risk filters only: the macro1 research found no
+6. Coordination (control channel, `docs/control.md`):
+   1. `python scripts/coordinator_report.py` -> read `reports/coord/<today>.md` (rule hits + proposed control.json).
+   2. Check `python scripts/control.py effective` (what the EA applies now) and `control/CHANGELOG.md`.
+   3. Decide. Apply with `python scripts/coordinator_report.py --apply`, or edit `control/control.json` (bump `seq`,
+      codes `M###` only, reason codes from `control/reason_codes.md`, no prices in `notes_vi`) and run
+      `python scripts/control.py normalize`. Commit `control/` and `reports/coord/`, pull --rebase, push.
+   4. Refresh the file at least every 48 h while directives should stay active (expiry), never later than 72 h
+      (staleness = NEUTRAL). Boosts only take effect up to the user's local `InpGhMaxRiskMult`.
+7. Write findings for the user. Macro values are context and risk filters only: the macro1 research found no
    out-of-sample edge from them for 1R gold trades. Do not present them as signals.
 
 ## Rules for changes
@@ -33,5 +41,8 @@ Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every
 * Workflows use only `GITHUB_TOKEN` with minimal `permissions`. Never interpolate `client_payload` (or any event text)
   with `${{ }}` into `run:`; read the event file from Python.
 * The calendar (`data/calendar/events_us.csv`) is maintained by hand; see the data dictionary for the procedure.
+* Control channel: never weaken the EA-side hard limits (cap `InpGhMaxRiskMult`, max risk per trade, loss stops, crisis
+  layer, NEUTRAL fallback, no remote trading, no SL/TP changes). Keep `scripts/control.py`, the MQL5 validator and
+  `tests/test_control.py` / `tests/test_mql5_static.py` in sync.
 * The MQL5 module cannot be compiled here; after editing it, run `tests/test_mql5_static.py` and ask the user to
   compile in MetaEditor.

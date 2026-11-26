@@ -121,7 +121,7 @@ most 10):
 | `phase` | current EA phase name |
 | `eq` | `day_pl_pct` (closed P/L today), `eq_day_pct` (equity vs day start), `float_pct` (open P/L), all % of balance |
 | `mkt` | `sym`, `move_atr` (today's move vs previous D1 close in ATR14(D1) units). No prices. |
-| `periods.day` / `.week` / `.mtd` | aggregate block for today (server day), the rolling last 7 days, month to date |
+| `periods.day` / `.week` / `.mtd` / `.r30` | aggregate block for today (server day), the rolling last 7 days, month to date, the rolling last 30 days (coordinator input) |
 | `flags[]` | `{key, msg}` raised by the EA with `ZGB_Flag()` (published: keep prices out of `msg`) |
 
 Aggregate block (positions that are fully closed, counted at their last exit):
@@ -137,8 +137,9 @@ Aggregate block (positions that are fully closed, counted at their last exit):
 | `max_ls`, `cur_ls`, `lead_ls` | longest losing streak, losing streak at the end, losing streak at the start (lets periods be chained) |
 | `dd_pct` | max peak-to-trough of the cumulative closed P/L % within the period |
 | `rule` | counts: `no_sl`, `risk_cap` (risk > `InpGhRiskCapPct`), `news` (entry within +-`InpGhNewsBlockMin` of NFP/CPI/FOMC), `daily_cap` (days with closed P/L <= -`InpGhDailyCapPct`) |
-| `by_method` | `{"M001": {n, wins, win_pct, net_r}, ...}`: **method codes**, never names (see below) |
+| `by_method` | `{"M001": {n, wins, win_pct, net_r, cur_ls, l20_n, l20_wins}, ...}`: **method codes**, never names (see below); `cur_ls` = current losing streak of the group, `l20_*` = its last 20 trades |
 | `by_phase` | same per phase name |
+| `by_method_phase` | same per `"M###:PHASE"` (used by the coordinator rules) |
 | `grid` | `mtd` only: `{"Mon": {"08": {n, wins}}}` weekday x 4-hour UTC bucket of the entry; cells with `n < 3` carry the count only |
 | `n_ex`, `mae_r`, `mfe_r` | optional average worst / best excursion in R (positions tracked while open) |
 
@@ -176,3 +177,9 @@ Split into parts when larger than `InpGhMaxPayloadBytes`.
 Merging (`agg.merge_aggs`, used for fallbacks and the all-time total): counts, R, % and rule counts add up exactly;
 streaks chain through `lead_ls` / `cur_ls`; the merged drawdown is a lower bound (the largest part drawdown or the
 drawdown of the end-of-part P/L path).
+
+## Control channel
+
+`control/control.json` (schema v1), `control/CHANGELOG.md` and `control/reason_codes.md`: see
+[`docs/control.md`](control.md). `reports/coord/YYYY-MM-DD.md` / `.json`: coordinator suggestions (rule hits, proposed
+changes and a full proposed `control.json`).

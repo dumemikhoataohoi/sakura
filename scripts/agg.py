@@ -15,7 +15,7 @@ import re
 
 from zumi_common import mask_secrets
 
-PERIODS = ("day", "week", "mtd")
+PERIODS = ("day", "week", "mtd", "r30")   # r30 = rolling 30 days (coordinator input)
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 BUCKETS = ("00", "04", "08", "12", "16", "20")  # 4-hour UTC buckets of the entry time
 MIN_CELL_N = 3                                    # grid cells below this count show no win data
@@ -27,7 +27,8 @@ RULES = ("no_sl", "risk_cap", "news", "daily_cap")
 AGG_INT = ("n", "wins", "losses", "be", "max_ls", "cur_ls", "lead_ls")
 AGG_FLOAT = ("win_pct", "net_r", "avg_r", "gross_win_r", "gross_loss_r", "pf", "net_pct", "dd_pct",
              "mae_r", "mfe_r", "n_r", "n_ex")
-GROUP_KEYS = {"n": int, "wins": int, "win_pct": float, "net_r": float, "net_pct": float}
+GROUP_KEYS = {"n": int, "wins": int, "win_pct": float, "net_r": float, "net_pct": float,
+              "cur_ls": int, "l20_n": int, "l20_wins": int}   # streak / last-20 trades of the group
 EQ_KEYS = ("day_pl_pct", "eq_day_pct", "float_pct")
 # per-trade style keys: if any of these show up anywhere they are stripped (and reported)
 PER_TRADE_KEYS = {"trades", "log", "deal", "deals", "pos", "position", "ticket", "order", "t", "t_in", "t_out",
@@ -80,6 +81,7 @@ def _group(obj, path: str, stripped: set) -> dict | None:
 
 
 def _merge_group(a: dict, b: dict) -> dict:
+    # cur_ls / l20_* describe the END of one sequence and are not additive: they are dropped here
     out = {"n": a.get("n", 0) + b.get("n", 0), "wins": a.get("wins", 0) + b.get("wins", 0),
            "net_r": round(a.get("net_r", 0.0) + b.get("net_r", 0.0), 3)}
     if "net_pct" in a or "net_pct" in b:
@@ -109,6 +111,11 @@ def _method_key(k: str) -> str:
 
 def _phase_key(k: str) -> str:
     return PHASE_RE.sub("", k)[:24] or "none"
+
+
+def _method_phase_key(k: str) -> str:
+    code, _, phase = k.partition(":")
+    return f"{_method_key(code)}:{_phase_key(phase)}"
 
 
 def _grid(obj, path: str, stripped: set) -> dict:
@@ -155,6 +162,8 @@ def sanitize_agg_block(obj, path: str, stripped: set) -> dict | None:
             val = _groups(v, f"{path}.by_method", stripped, _method_key)
         elif k == "by_phase":
             val = _groups(v, f"{path}.by_phase", stripped, _phase_key)
+        elif k == "by_method_phase":
+            val = _groups(v, f"{path}.by_method_phase", stripped, _method_phase_key)
         elif k == "grid":
             val = _grid(v, f"{path}.grid", stripped)
         else:

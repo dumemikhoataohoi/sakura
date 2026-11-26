@@ -1,0 +1,45 @@
+name: control
+
+# Validates control/control.json on every push that touches control/**.
+# An invalid file fails the run and posts an alert comment on the alerts PR.
+# The EA re-validates on its side and treats an invalid file as NEUTRAL anyway.
+on:
+  push:
+    branches: [main]
+    paths: ["control/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write        # only used to create the 'alerts' branch + marker commit when the alerts PR is missing
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: control
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the previous commit is needed for the seq check
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate control.json (bounds, expiry, seq, normalized form)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          prev="${BEFORE:-HEAD^}"
+          python scripts/control.py check --prev-ref "$prev" --alert-on-fail

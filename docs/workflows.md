@@ -45,6 +45,14 @@ Or from a shell with the `gh` CLI (logged in with an account or token that can w
 gh api repos/<owner>/<repo>/dispatches --input dispatch.json
 ```
 
+## `control.yml`
+
+* Trigger: `push` to `main` touching `control/**`, and `workflow_dispatch`.
+* Runs `python scripts/control.py check --prev-ref <before>`: schema, bounds, expiry, reason codes, public text,
+  normalized form, and `seq` greater than in the previous commit. On failure the run fails and posts a
+  `control_invalid` alert on the alerts PR (the EA treats an invalid file as NEUTRAL anyway).
+* Permissions: same as `alerts.yml` (the `contents: write` is only used if the alerts PR must be created).
+
 ## `alerts.yml`
 
 * Triggers: `workflow_run` of `data` and `reports` (`completed`, any conclusion except `cancelled`) and `workflow_dispatch`

@@ -57,6 +57,26 @@ reveal "something closed in the previous slot", never a trade time.
 | `ZGB_OnTradeTransaction(t)` | `DEAL_ADD`: remember the phase at entry; a closing deal marks a report as due |
 | `ZGB_Deinit()` | write a pending report to the queue (no network in `OnDeinit`) |
 
+## Control channel (`InpGhControlEnable`, default false)
+
+| function | returns |
+|---|---|
+| `ZGB_ReadControl(allow_network=true)` | called by `ZGB_OnTimer` (fetch at most every `InpGhControlEveryMin`); true while directives are active |
+| `ZGB_RiskMult(methodName, phaseLabel)` | global x method multiplier, clamped to `[0, InpGhMaxRiskMult]`; 1.0 when NEUTRAL |
+| `ZGB_ApplyRisk(baseRiskPct, maxRiskPct, methodName, phaseLabel)` | `min(base x multiplier, max)`: the EA's max risk per trade always wins |
+| `ZGB_MethodPaused(methodName, phaseLabel)` | true for `pause_all` or a matching `pause` |
+| `ZGB_MethodEnabled(methodName, phaseLabel, enabledByDefault)` | false when paused; an off-by-default method runs only with a matching `on` AND `InpGhAllowEnable` |
+| `ZGB_ExtraNewsBlock(tUtc)` | inside a `block` window (only adds blocking) |
+| `ZGB_NewsAllowed(tUtc)` | inside an `allow` window and `InpGhAllowNewsOverride`; never when a block also covers `tUtc` |
+
+Method names are mapped to codes through the local map file (`ZGB_MethodCode`). Every applied file is logged
+(`ZumiGitHubBridge control: M003 pause x0.00 phases[,TREND,] until ... (R01)`), including removed directives and the
+switch back to NEUTRAL. Local validation repeats the server rules (version, author, seq, updated time, 72 h staleness,
+7-day expiry, modes and bounds, window lengths, reason-code format); any problem means NEUTRAL. The loss stops, the
+crisis layer and the max risk per trade stay in the EA's own code: call these functions only to *reduce*, pause, gate
+or (within the cap) scale what the EA would do anyway. Inputs: `InpGhControlEnable`, `InpGhControlPath`,
+`InpGhControlEveryMin`, `InpGhMaxRiskMult` (1.0), `InpGhAllowEnable` (false), `InpGhAllowNewsOverride` (false).
+
 ## Behaviour
 
 * **Statistics source.** Mode 0 recomputes everything from the terminal's deal history at each report (history since

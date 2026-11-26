@@ -98,6 +98,7 @@ class Mql5StaticTest(unittest.TestCase):
         code = strip_code(self.mqh) + strip_code(self.demo)
         defined = set(re.findall(r"^\s*(?:[A-Za-z_]\w*\s+)+&?(ZGB_\w+)\s*\(", code, re.M))
         called = set(re.findall(r"\b(ZGB_\w+)\s*\(", code))
+        called = {c for c in called if not re.fullmatch(r"ZGB_[A-Z0-9_]+", c)}   # macros like ZGB_CTL_MAX_TTL (...)
         self.assertEqual(called - defined, set())
 
     def test_webrequest_and_char_arrays(self):
@@ -125,6 +126,43 @@ class Mql5StaticTest(unittest.TestCase):
         self.assertRegex(self.mqh, r"input bool\s+InpGhEnable\s+= false;")
         self.assertRegex(self.mqh, r"input int\s+InpGhReportMode\s+= 0;")   # aggregate by default (public repo)
         self.assertIn('"kind\\":\\"ea_agg\\"', self.mqh)
+
+    def _body(self, signature: str) -> str:
+        start = self.mqh.index(signature)
+        i, depth = self.mqh.index("{", start), 0
+        for j in range(i, len(self.mqh)):
+            depth += {"{": 1, "}": -1}.get(self.mqh[j], 0)
+            if depth == 0:
+                return self.mqh[start:j + 1]
+        raise AssertionError(signature)
+
+    def test_control_api_and_hard_limits(self):
+        for fn in ("bool ZGB_ReadControl(", "double ZGB_RiskMult(const string method_name, const string phase_label)",
+                   "bool ZGB_MethodPaused(const string method_name, const string phase_label)",
+                   "bool ZGB_MethodEnabled(", "bool ZGB_ExtraNewsBlock(const datetime t_utc)",
+                   "bool ZGB_NewsAllowed(const datetime t_utc)", "double ZGB_ApplyRisk("):
+            self.assertIn(fn, self.mqh)
+        for name, default in (("InpGhControlEnable", "false"), ("InpGhMaxRiskMult", "1.0"),
+                              ("InpGhAllowEnable", "false"), ("InpGhAllowNewsOverride", "false")):
+            self.assertRegex(self.mqh, rf"input \w+\s+{name}\s+= {default};")
+        active = self._body("bool ZGB_CtlActive(void)")
+        self.assertIn("MQL_TESTER", active)                      # tester -> NEUTRAL
+        self.assertIn("ZGB_CTL_STALE_S", active)                 # > 72 h -> NEUTRAL
+        self.assertIn("#define ZGB_CTL_STALE_S (72 * 3600)", self.mqh)
+        self.assertIn("#define ZGB_CTL_MAX_TTL (7 * 86400)", self.mqh)
+        rm = self._body("double ZGB_RiskMult(")
+        self.assertIn("InpGhMaxRiskMult", rm)                    # clamped to the EA's own cap
+        self.assertIn("return(1.0)", rm)                         # inactive -> neutral multiplier
+        self.assertIn("MathMin(base_risk_pct * ZGB_RiskMult(method_name, phase_label), max_risk_pct)",
+                      self._body("double ZGB_ApplyRisk("))      # never above the EA max risk per trade
+        self.assertIn("InpGhAllowEnable", self._body("bool ZGB_MethodEnabled("))
+        allowed = self._body("bool ZGB_NewsAllowed(")
+        self.assertIn("InpGhAllowNewsOverride", allowed)
+        self.assertIn("ZGB_ExtraNewsBlock(t_utc)", allowed)      # a block always wins over an allow
+        self.assertIn("ZGB_CtlClear();", self._body("bool ZGB_ReadControl("))   # invalid / missing -> NEUTRAL
+        code = strip_code(self.mqh)
+        for forbidden in ("OrderSend", "PositionClose", "PositionModify", "OrderModify", "CTrade", "TRADE_ACTION"):
+            self.assertNotIn(forbidden, code)                    # the bridge never trades
 
     def test_aggregate_payload_has_no_per_trade_fields(self):
         start = self.mqh.index("string ZGB_AggJson(")

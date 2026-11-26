@@ -6,7 +6,9 @@ Kho này là "bộ não dữ liệu" của EA Zumi (MT5, vàng XAUUSDm trên Exn
 * **(b)** nhận báo cáo **thống kê tổng hợp** do EA gửi về (repo public: không có từng lệnh, giờ, giá, SL/TP hay ticket;
   phương pháp chỉ hiện dưới dạng mã `M001`..);
 * **(c)** tạo trang tổng kết ngày/tuần/tháng để Claude đọc và phân tích hằng ngày;
-* **(d)** phát cảnh báo khi có biến động lớn hoặc rủi ro, bằng comment trên một PR "zumi-alerts" mà Claude theo dõi.
+* **(d)** phát cảnh báo khi có biến động lớn hoặc rủi ro, bằng comment trên một PR "zumi-alerts" mà Claude theo dõi;
+* **(e)** kênh điều phối `control/control.json`: Claude tạm dừng / giảm / tăng / bật lại từng mã phương pháp, chỉnh rủi ro
+  chung và thêm vùng chặn tin; EA tự áp dụng trong giới hạn cứng do chính EA đặt.
 
 ## English summary
 
@@ -24,7 +26,11 @@ clock-aligned slots. A whitelist validator strips anything else and the pipeline
 `reports.public_mode` is true. `reports.yml` stores the reports under `reports/YYYY/MM/DD/` with a hashed account id and
 renders daily/weekly/monthly pages plus a static dashboard. `alerts.yml` checks VIX jumps, EA daily loss, losing streaks,
 drawdown, rule breaks, gold moves vs ATR, upcoming NFP/CPI/FOMC and data-quality failures, and comments (Vietnamese +
-English) on the open PR labelled `zumi-alerts`, which Claude subscribes to. Only `GITHUB_TOKEN` is used in workflows; the EA uses a fine-grained PAT
+English) on the open PR labelled `zumi-alerts`, which Claude subscribes to. A control channel
+(`control/control.json`, validated by `control.yml`, suggested daily by `scripts/coordinator_report.py` from
+pre-registered rules) lets Claude pause, reduce, boost or enable method codes, scale risk and add news windows; the EA
+re-validates it, falls back to NEUTRAL on any problem and clamps everything to its own hard limits
+(`InpGhMaxRiskMult`, default 1.0; max risk per trade, loss stops and crisis layer are never overridable). Only `GITHUB_TOKEN` is used in workflows; the EA uses a fine-grained PAT
 limited to this repository, kept in an MT5 input or a local file, never in the repo. Start with `AGENTS.md` and `docs/`.
 
 ## Kiến trúc và luồng dữ liệu
@@ -122,6 +128,29 @@ python scripts/alerts.py --dry-run           # in ra các cảnh báo
 * **Bộ kiểm tra phía server** (`scripts/agg.py`): chỉ giữ các khóa trong danh sách cho phép; loại bỏ `trades`, `log`, giá,
   giờ, ticket, comment, số tiền, khóa tài khoản; gộp mọi tên phương pháp không phải dạng `M###` vào `M000`; workflow log
   chỉ in tên các khóa bị loại, không in giá trị. Báo cáo chi tiết (v1) bị từ chối khi `reports.public_mode` là `true`.
+
+## Kênh điều phối (control channel)
+
+Claude điều phối EA qua file công khai `control/control.json` ("tự áp dụng trong giới hạn"). Chi tiết: [`docs/control.md`](docs/control.md),
+mã lý do: [`control/reason_codes.md`](control/reason_codes.md), lịch sử: `control/CHANGELOG.md`.
+
+* **Chỉ thị:** `global.risk_mult` (0..2), `pause_all`; theo **mã** phương pháp `M###` (không bao giờ dùng tên):
+  `pause`, `reduce` (< 1), `boost` (> 1), `on` (bật lại, hoặc bật phương pháp mặc định tắt); có thể giới hạn theo `phases`;
+  `news_blocks` thêm vùng chặn tin (`block`) hoặc vùng cho phép (`allow`, tối đa 4 giờ) cho một sự kiện.
+* **Giới hạn cứng nằm trong EA (không thể ghi đè từ xa):**
+  * hệ số rủi ro bị kẹp theo input **`InpGhMaxRiskMult`** (mặc định **1.0** = kênh không bao giờ tăng rủi ro; muốn cho
+    phép `boost` bạn phải tự nâng input này trên máy, tối đa 2.0);
+  * rủi ro tối đa mỗi lệnh (EA131), dừng lỗ ngày/tuần và lớp xử lý khủng hoảng luôn được giữ;
+  * không mở/đóng lệnh từ xa, không sửa SL/TP;
+  * bật phương pháp mặc định tắt cần `InpGhAllowEnable=true`; nới lệnh cấm tin của EA cần `InpGhAllowNewsOverride=true`
+    (cả hai mặc định `false`).
+* **Trung tính (NEUTRAL):** file thiếu, sai, quá 72 giờ, hoặc mọi chỉ thị đã hết hạn → không dừng gì, hệ số 1.0. Mỗi chỉ
+  thị hết hạn sau tối đa 7 ngày (mặc định 48 giờ). Strategy Tester luôn trung tính. `seq` phải tăng dần.
+* **Quy trình:** `python scripts/coordinator_report.py` tạo đề xuất `reports/coord/YYYY-MM-DD.md` theo quy tắc đăng ký trước
+  (`config/settings.json` > `coordinator`); Claude xem xét, rồi `--apply` hoặc sửa tay + `python scripts/control.py normalize`,
+  commit, push. Workflow `control.yml` kiểm tra file và cảnh báo trên PR nếu file sai.
+* **Bật trên EA:** `InpGhControlEnable=true` (mặc định `false`), dùng `ZGB_ApplyRisk`, `ZGB_MethodPaused`,
+  `ZGB_MethodEnabled`, `ZGB_ExtraNewsBlock`, `ZGB_NewsAllowed` (xem `mql5/ZumiGitHubBridge_Demo.mq5`).
 
 ## Public hay private?
 

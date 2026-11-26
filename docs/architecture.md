@@ -22,7 +22,9 @@
         --> one comment on the open PR labelled "zumi-alerts" (branch "alerts")  --> Claude is notified
                                                                     \--> (optional, EA side) Telegram / Discord
 
-  Claude (daily): reads AGENTS.md -> data/latest.json, reports/daily/<yesterday>.md, weekly page, alerts PR.
+  Claude (daily): reads AGENTS.md -> data/latest.json, reports/daily/<yesterday>.md, weekly page, alerts PR
+        --> scripts/coordinator_report.py --> reports/coord/<day>.md (suggestion) --> Claude decides
+        --> control/control.json (+ CHANGELOG) --> control.yml validates --> EA ZGB_ReadControl (hourly, clamped, NEUTRAL fallback)
 ```
 
 ## Components

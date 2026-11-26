@@ -56,14 +56,22 @@ void OnTick()
       g_lastPhase = phase;
      }
 
-   if(NewsBlockActive())
+   if(NewsBlockActive() || ZGB_ExtraNewsBlock(TimeGMT()))
       return;             // e.g. skip new entries; manage open trades as usual
-   // ... your trading logic here ...
+
+   // Control channel (InpGhControlEnable): per method name + phase. The bridge maps names to codes locally.
+   string method = "demo-method";            // your setup name (stays on this PC; only its code is public)
+   if(!ZGB_MethodEnabled(method, phase, true) || ZGB_MethodPaused(method, phase))
+      return;
+   double risk_pct = ZGB_ApplyRisk(0.5, 1.0, method, phase);   // base 0.5 %, the EA's hard max 1.0 % stays in force
+   if(risk_pct <= 0)
+      return;
+   // ... your trading logic here, sized with risk_pct ...
   }
 
 void OnTimer()
   {
-   ZGB_OnTimer();                      // reports, queue flush, latest.json refresh (<= 1 request)
+   ZGB_OnTimer();                      // reports, queue flush, latest.json + control refresh (<= 1 request)
    ZGB_ReadLatest(g_ctx, false);       // parse the cache only: never blocks
    CheckLocalDayLoss();
    ShowContext();
