@@ -130,6 +130,9 @@ def build(root: Path, now: dt.datetime, session=None, offline: bool = False) -> 
                 if bars is not old_bars:
                     gold.write_bars_if_changed(gpath, bars)
                 gold_out = gsum
+                gctx = gold.context(bars, asof)
+                if gctx:
+                    gold_out["ctx"] = gctx
 
     ccfg = cfg.get("calendar", {})
     events = calendar_events.load_events(root / ccfg.get("file", "data/calendar/events_us.csv"))

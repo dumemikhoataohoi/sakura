@@ -33,6 +33,9 @@ jobs:
         id: build
         run: python scripts/build_latest.py --msg-file "$RUNNER_TEMP/commit_msg.txt"
 
+      - name: Weekly USD economic calendar (best effort, never fails the job)
+        run: python scripts/ff_calendar.py || true
+
       - name: Commit only when data changed
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
