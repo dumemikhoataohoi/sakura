@@ -19,6 +19,7 @@ Cập nhật lần cuối: 2026-11-27.
 | A7 | Phương pháp có công thức và quy luật rõ ràng kiểu Zumi; không phán đoán tùy hứng, không luật gắn với ngày cụ thể | ✅ |
 | A9 | **Mọi lệnh có thẻ phương pháp**: công thức điểm vào, SL, TP, thời gian giữ, giai đoạn được phép và **xác suất thắng** đo được (trên dữ liệu đã chỉnh, kiểm tra chéo, chạy thật). Các họ phương pháp cần có: Zumi, Price Action, SMC/ICT, chỉ báo + đồng thuận đa khung, Breakout & Momentum, Volume Profile/AMT, Order Flow/Tape | 🟡 Thư viện đã có Zumi, PA, SMC (vùng), chỉ báo/đa khung, breakout/ORB. Sổ thẻ phương pháp đang soạn. AMT/Order Flow chỉ làm được bằng tick volume (CFD vàng không có khối lượng thật và sổ lệnh) |
 | A10 | Số lệnh mở rộng **theo đo lường**: 550/tháng hiện tại → ~1000–1500 ứng viên → 3000–5000, chỉ khi lớp lọc chứng minh còn lợi thế | 🟡 |
+| A11 | **Mục tiêu tối thiểu kế tiếp (v1.38)**: trên 23 tháng ngoài mẫu (2025-01..2026-11) tỉ lệ thắng **≥65%** ở 1R và **80–90 lệnh/tháng**, có lãi sau phí, rủi ro không tệ hơn v1.37 | ❌ Hiện v1.37: 56,8%, ~30 lệnh/tháng |
 | A8 | Được giữ lệnh qua cuối tuần và quá 1440 phút | ✅ |
 
 ## B. Phân tích thị trường (EA và Claude)
