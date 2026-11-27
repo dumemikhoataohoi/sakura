@@ -20,10 +20,19 @@
       "risk_mult": 0.0
     }
   },
-  "news_blocks": [],
-  "notes_vi": "Kh\u1edfi \u0111\u1ed9ng b\u1ea3n EA m\u1edbi th\u1eadn tr\u1ecdng: gi\u1ea3m r\u1ee7i ro v\u00e0 h\u1ea1 tr\u1ea7n r\u1ee7i ro m\u1edf; n\u1edbi d\u1ea7n khi k\u1ebft qu\u1ea3 th\u1eadt t\u1ed1t.",
-  "seq": 3,
-  "updated_unix": 1795745272,
-  "updated_utc": "2026-11-27T02:07:52Z",
+  "news_blocks": [
+    {
+      "end_unix": 1795816800,
+      "end_utc": "2026-11-27T22:00:00Z",
+      "kind": "block",
+      "reason_code": "R04",
+      "start_unix": 1795804200,
+      "start_utc": "2026-11-27T18:30:00Z"
+    }
+  ],
+  "notes_vi": "Th\u1ee9 S\u00e1u sau l\u1ec5 T\u1ea1 \u01a1n: thanh kho\u1ea3n m\u1ecfng, M\u1ef9 \u0111\u00f3ng c\u1eeda s\u1edbm; ch\u1eb7n v\u00e0o l\u1ec7nh m\u1edbi cu\u1ed1i phi\u00ean M\u1ef9.",
+  "seq": 4,
+  "updated_unix": 1795783768,
+  "updated_utc": "2026-11-27T12:49:28Z",
   "v": 1
 }
