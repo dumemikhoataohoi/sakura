@@ -17,6 +17,8 @@ Cập nhật lần cuối: 2026-11-27.
 | A5 | Không lệnh thua lớn: không có chuyện 1 lệnh thua bằng 2–3 lệnh thắng (thắng và thua đều ~1R) | 🟡 EA161 chốt trọn 1R. Đo R thắng TB so với R thua TB mỗi ngày |
 | A6 | Lệnh đơn, SL/TP đặt ngay khi vào lệnh, rủi ro ≤ 1%/lệnh; không DCA/lưới/martingale/hedge | ✅ |
 | A7 | Phương pháp có công thức và quy luật rõ ràng kiểu Zumi; không phán đoán tùy hứng, không luật gắn với ngày cụ thể | ✅ |
+| A9 | **Mọi lệnh có thẻ phương pháp**: công thức điểm vào, SL, TP, thời gian giữ, giai đoạn được phép và **xác suất thắng** đo được (trên dữ liệu đã chỉnh, kiểm tra chéo, chạy thật). Các họ phương pháp cần có: Zumi, Price Action, SMC/ICT, chỉ báo + đồng thuận đa khung, Breakout & Momentum, Volume Profile/AMT, Order Flow/Tape | 🟡 Thư viện đã có Zumi, PA, SMC (vùng), chỉ báo/đa khung, breakout/ORB. Sổ thẻ phương pháp đang soạn. AMT/Order Flow chỉ làm được bằng tick volume (CFD vàng không có khối lượng thật và sổ lệnh) |
+| A10 | Số lệnh mở rộng **theo đo lường**: 550/tháng hiện tại → ~1000–1500 ứng viên → 3000–5000, chỉ khi lớp lọc chứng minh còn lợi thế | 🟡 |
 | A8 | Được giữ lệnh qua cuối tuần và quá 1440 phút | ✅ |
 
 ## B. Phân tích thị trường (EA và Claude)
