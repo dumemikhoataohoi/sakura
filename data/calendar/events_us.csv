@@ -1,4 +1,4 @@
-# KNOWLEDGE-BASED (assistant memory of official BLS/FOMC schedules, NOT downloaded). flag uncertain = low confidence (2025 shutdown period, 2026). Release time America/New_York.
+# KNOWLEDGE-BASED (assistant memory of official BLS/FOMC schedules, NOT downloaded). flag uncertain = low confidence (2025 shutdown period, 2026). Release time America/New_York. Rows from 2026-11 onward without a flag (incl. all 2027 rows) were checked against the official BLS release schedules and the Fed FOMC calendar (2027 tentative, revised 2026-11-12) on 2026-11-27; FOMC 2027-10-26/27 is strategy-only (no decision) and not listed.
 date,event,time_et,flag
 2018-01-05,NFP,08:30,
 2018-02-02,NFP,08:30,
@@ -105,8 +105,20 @@ date,event,time_et,flag
 2026-08-07,NFP,08:30,uncertain
 2026-09-04,NFP,08:30,uncertain
 2026-10-02,NFP,08:30,uncertain
-2026-11-06,NFP,08:30,uncertain
-2026-12-04,NFP,08:30,uncertain
+2026-11-06,NFP,08:30,
+2026-12-04,NFP,08:30,
+2027-01-08,NFP,08:30,
+2027-02-05,NFP,08:30,
+2027-03-05,NFP,08:30,
+2027-04-02,NFP,08:30,
+2027-05-07,NFP,08:30,
+2027-06-04,NFP,08:30,
+2027-07-02,NFP,08:30,
+2027-08-06,NFP,08:30,
+2027-09-03,NFP,08:30,
+2027-10-08,NFP,08:30,
+2027-11-05,NFP,08:30,
+2027-12-03,NFP,08:30,
 2018-01-12,CPI,08:30,
 2018-02-14,CPI,08:30,
 2018-03-13,CPI,08:30,
@@ -212,8 +224,20 @@ date,event,time_et,flag
 2026-08-12,CPI,08:30,uncertain
 2026-09-11,CPI,08:30,uncertain
 2026-10-14,CPI,08:30,uncertain
-2026-11-10,CPI,08:30,uncertain
-2026-12-10,CPI,08:30,uncertain
+2026-11-10,CPI,08:30,
+2026-12-10,CPI,08:30,
+2027-01-13,CPI,08:30,
+2027-02-11,CPI,08:30,
+2027-03-10,CPI,08:30,
+2027-04-13,CPI,08:30,
+2027-05-12,CPI,08:30,
+2027-06-10,CPI,08:30,
+2027-07-14,CPI,08:30,
+2027-08-11,CPI,08:30,
+2027-09-14,CPI,08:30,
+2027-10-14,CPI,08:30,
+2027-11-10,CPI,08:30,
+2027-12-10,CPI,08:30,
 2018-01-31,FOMC,14:00,
 2018-03-21,FOMC,14:00,
 2018-05-02,FOMC,14:00,
@@ -287,3 +311,10 @@ date,event,time_et,flag
 2026-09-16,FOMC,14:00,
 2026-10-28,FOMC,14:00,
 2026-12-09,FOMC,14:00,
+2027-01-27,FOMC,14:00,
+2027-03-17,FOMC,14:00,
+2027-04-28,FOMC,14:00,
+2027-06-09,FOMC,14:00,
+2027-07-28,FOMC,14:00,
+2027-09-15,FOMC,14:00,
+2027-11-17,FOMC,14:00,

@@ -116,3 +116,10 @@ The module was reviewed statically (`tests/test_mql5_static.py` lints braces, fu
 signature, char-array conversions, `StringFormat` arity, safe defaults, and that the aggregate builder contains no
 per-trade fields), but it has **not** been compiled in MetaEditor in this environment. Compile it once and report any
 error.
+
+## Open-risk cap (bridge 2.3)
+
+`double ZGB_OpenRiskCap(double local_cap)` returns the EA's total open-risk cap after the control file:
+`min(local_cap, global.open_risk_pct)` while the global directive is active, otherwise `local_cap`. It never returns
+more than the local cap, so the control channel can only tighten it (or relax it back to the user's own value).
+EA161 v1.30 uses it for every new entry.

@@ -155,6 +155,9 @@ class Mql5StaticTest(unittest.TestCase):
         self.assertIn("return(1.0)", rm)                         # inactive -> neutral multiplier
         self.assertIn("MathMin(base_risk_pct * ZGB_RiskMult(method_name, phase_label), max_risk_pct)",
                       self._body("double ZGB_ApplyRisk("))      # never above the EA max risk per trade
+        orc = self._body("double ZGB_OpenRiskCap(")
+        self.assertIn("return(MathMin(r, local_cap));", orc)   # the remote cap never exceeds the EA's local cap
+        self.assertIn("ZGB_CtlGlobalActive()", orc)              # inactive / stale -> local cap
         self.assertIn("InpGhAllowEnable", self._body("bool ZGB_MethodEnabled("))
         allowed = self._body("bool ZGB_NewsAllowed(")
         self.assertIn("InpGhAllowNewsOverride", allowed)

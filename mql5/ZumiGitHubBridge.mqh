@@ -15,6 +15,8 @@
 //|  CONTROL (off by default, InpGhControlEnable): reads             |
 //|  control/control.json hourly -> ZGB_RiskMult / ZGB_MethodPaused /|
 //|  ZGB_MethodEnabled / ZGB_ExtraNewsBlock / ZGB_NewsAllowed.       |
+//|  2.3: ZGB_OpenRiskCap(local) = min(local, global.open_risk_pct)  |
+//|  while the global block is active (only tightens, never > local)|
 //|  HARD LIMITS stay in the EA: multipliers are clamped to          |
 //|  InpGhMaxRiskMult (default 1.0 = never increase); the EA's max   |
 //|  risk per trade, daily/weekly loss stops and crisis layer are    |
@@ -59,11 +61,13 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.2"
+#define ZGB_VERSION "2.3"
 #define ZGB_CTL_CACHE   "zumi_gh_control.json"
 #define ZGB_CTL_STALE_S (72 * 3600)
 #define ZGB_CTL_MAX_TTL (7 * 86400)
 #define ZGB_CTL_MAXMULT 2.0
+#define ZGB_ORP_MIN 1.0                // 2.3: global.open_risk_pct valid range (% of balance), = sakura scripts/control.py
+#define ZGB_ORP_MAX 20.0
 
 input group "=== Zumi GitHub bridge ==="
 input bool   InpGhEnable          = false;               // Enable the GitHub bridge
@@ -849,6 +853,7 @@ datetime g_zgbCtlNextRead = 0;
 bool     g_zgbCtlWasActive = false;
 double   g_zgbCtlGMult   = 1.0;
 bool     g_zgbCtlPauseAll = false;
+double   g_zgbCtlORP     = 0.0;     // 2.3: global.open_risk_pct (0 = no remote value)
 long     g_zgbCtlGExp    = 0;
 string   g_zgbCtlGReason = "";
 string   g_zgbCtlCode[];
@@ -926,7 +931,7 @@ double ZGB_Clamp(const double v, const double lo, const double hi) { return(Math
 void ZGB_CtlClear(void)
   {
    g_zgbCtlValid = false;
-   g_zgbCtlGMult = 1.0; g_zgbCtlPauseAll = false; g_zgbCtlGExp = 0; g_zgbCtlGReason = "";
+   g_zgbCtlGMult = 1.0; g_zgbCtlPauseAll = false; g_zgbCtlORP = 0.0; g_zgbCtlGExp = 0; g_zgbCtlGReason = "";
    ArrayResize(g_zgbCtlCode, 0); ArrayResize(g_zgbCtlMode, 0); ArrayResize(g_zgbCtlMult, 0);
    ArrayResize(g_zgbCtlPhases, 0); ArrayResize(g_zgbCtlExp, 0); ArrayResize(g_zgbCtlReason, 0);
    ArrayResize(g_zgbCtlWKind, 0); ArrayResize(g_zgbCtlWStart, 0); ArrayResize(g_zgbCtlWEnd, 0); ArrayResize(g_zgbCtlWReason, 0);
@@ -950,6 +955,12 @@ bool ZGB_CtlApplyText(const string &s, const bool save, string &err)
    double gm = 1.0, pa = 0;
    if(ZGB_JNumber(s, "global.risk_mult", v)) gm = ZGB_Clamp(v, 0.0, ZGB_CTL_MAXMULT);
    ZGB_JNumber(s, "global.pause_all", pa);
+   double orp = 0.0;                                                  // 2.3: absent / invalid = no remote value
+   if(ZGB_JNumber(s, "global.open_risk_pct", v))
+     {
+      if(MathIsValidNumber(v) && v >= ZGB_ORP_MIN && v <= ZGB_ORP_MAX) orp = v;
+      else PrintFormat("ZumiGitHubBridge control: global.open_risk_pct %.4f outside [%.0f, %.0f] -> ignored (EA local cap)", v, ZGB_ORP_MIN, ZGB_ORP_MAX);
+     }
    long gexp = ZGB_JTime(s, "global.expires");
    if(gexp <= 0) gexp = upd + 48 * 3600;
    if(gexp <= upd) { err = "global.expires"; return(false); }
@@ -1017,6 +1028,9 @@ bool ZGB_CtlApplyText(const string &s, const bool save, string &err)
      }
    // ---- valid: log the differences with reason codes, then commit
    PrintFormat("ZumiGitHubBridge control: applying seq %I64d (updated %s UTC)", (long)seq, TimeToString((datetime)upd, TIME_DATE | TIME_MINUTES));
+   if(orp != g_zgbCtlORP || !g_zgbCtlValid)
+      PrintFormat("ZumiGitHubBridge control: global open_risk_pct %s until %s UTC (%s)%s", orp > 0 ? StringFormat("%.2f%%", orp) : "none (EA local cap)",
+                  TimeToString((datetime)gexp, TIME_DATE | TIME_MINUTES), greason, (gexp <= (long)TimeGMT()) ? " (inactive: expired)" : "");
    if(gm != g_zgbCtlGMult || (pa != 0) != g_zgbCtlPauseAll || !g_zgbCtlValid)
       PrintFormat("ZumiGitHubBridge control: global risk_mult %.2f (cap %.2f) pause_all %s until %s UTC (%s)", gm,
                   ZGB_Clamp(InpGhMaxRiskMult, 0.0, ZGB_CTL_MAXMULT), pa != 0 ? "true" : "false",
@@ -1040,7 +1054,7 @@ bool ZGB_CtlApplyText(const string &s, const bool save, string &err)
                   TimeToString((datetime)we[q], TIME_DATE | TIME_MINUTES), wr[q]);
    ZGB_CtlClear();
    g_zgbCtlSeq = (long)seq; g_zgbCtlUpdated = upd;
-   g_zgbCtlGMult = gm; g_zgbCtlPauseAll = (pa != 0); g_zgbCtlGExp = gexp; g_zgbCtlGReason = greason;
+   g_zgbCtlGMult = gm; g_zgbCtlPauseAll = (pa != 0); g_zgbCtlORP = orp; g_zgbCtlGExp = gexp; g_zgbCtlGReason = greason;
    ArrayResize(g_zgbCtlCode, nm); ArrayResize(g_zgbCtlMode, nm); ArrayResize(g_zgbCtlMult, nm);
    ArrayResize(g_zgbCtlPhases, nm); ArrayResize(g_zgbCtlExp, nm); ArrayResize(g_zgbCtlReason, nm);
    for(int k = 0; k < nm; k++)
@@ -1146,6 +1160,16 @@ double ZGB_RiskMult(const string method_name, const string phase_label)
      }
    double cap = ZGB_Clamp(InpGhMaxRiskMult, 0.0, ZGB_CTL_MAXMULT);
    return(ZGB_Clamp(m, 0.0, cap));
+  }
+
+// 2.3: total open-risk cap for new entries = min(local_cap, remote global.open_risk_pct) while the global block is active
+// (valid, fresh <= 72 h, not expired, channel enabled, not the tester). Never above local_cap; never below 1.0 (unless local_cap < 1).
+double ZGB_OpenRiskCap(const double local_cap)
+  {
+   double r = local_cap;
+   if(ZGB_CtlGlobalActive() && g_zgbCtlORP >= ZGB_ORP_MIN) r = MathMin(local_cap, g_zgbCtlORP);
+   r = MathMax(r, MathMin(ZGB_ORP_MIN, local_cap));
+   return(MathMin(r, local_cap));
   }
 
 // Base risk x multiplier, never above the EA's own max risk per trade (that cap is not overridable).
