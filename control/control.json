@@ -5,7 +5,8 @@
     "expires_utc": "2026-11-28T23:00:00Z",
     "pause_all": false,
     "reason_code": "R05",
-    "risk_mult": 0.5
+    "risk_mult": 0.5,
+    "open_risk_pct": 6
   },
   "methods": {
     "M701": {
@@ -20,9 +21,8 @@
     }
   },
   "news_blocks": [],
-  "notes_vi": "\u0110\u1ec1 xu\u1ea5t t\u1ef1 \u0111\u1ed9ng theo quy t\u1eafc \u0111\u0103ng k\u00fd tr\u01b0\u1edbc; Claude xem x\u00e9t v\u00e0 quy\u1ebft \u0111\u1ecbnh.",
-  "seq": 2,
-  "updated_unix": 1795736799,
-  "updated_utc": "2026-11-26T23:46:39Z",
+  "notes_vi": "Khởi động v1.30 thận trọng: rủi ro x0.5, trần rủi ro mở 6% (EA đặt 12%); nới dần khi kết quả thật tốt.",
+  "seq": 3,
+  "updated_utc": "2026-11-27T02:07:52Z",
   "v": 1
 }
