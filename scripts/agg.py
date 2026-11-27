@@ -37,8 +37,138 @@ PER_TRADE_KEYS = {"trades", "log", "deal", "deals", "pos", "position", "ticket",
                   "equity", "profit", "pl", "volume", "vol", "vol_in"}
 
 
+REASONS = ("periodic", "dayend", "flag", "manual", "deinit", "heartbeat")   # anything else -> "other"
+
+# ---- mkt.ctx (bridge 2.4 / EA161 v1.31): EA market context, bucketed or relative values only (no prices, no times)
+CTX_TFS = ("D1", "H4", "H1", "M15")
+CTX_TF_INT = {"dir": (-1, 1), "rsi": (0, 100), "adx": (0, 100), "pb": (-100, 200), "ichi": (-1, 1)}
+CTX_TF_SIGN = ("e50", "e200")                                     # -1 / 1 only
+CTX_CANDLES = ("OTHER", "ENG_UP", "ENG_DN", "PIN_UP", "PIN_DN", "INSIDE", "OUTSIDE", "DOJI", "MARU_UP", "MARU_DN")
+CTX_REV_RE = re.compile(r"^(?:(?:W1|D1|H4|H1|M15):(?:SWEEP_HI|SWEEP_LO|PIN_BULL|PIN_BEAR|ENGULF_BULL|ENGULF_BEAR|"
+                        r"DIV_BULL|DIV_BEAR)|REF:R[1-9])$")
+CTX_REV_MAX = 8
+CTX_PHASE_RE = re.compile(r"^[A-Z]{2,8}$")
+CTX_CR_RE = re.compile(r"^(?:OFF|OK|BLOCK(?::(?:VOL|SPREAD|GAP|NEWS|DAYSTOP|WEEKSTOP|SAMESIDE|OTHER))?)$")
+CTX_ATR_MAX = 50.0                                                # |distance| in ATR(H1) units; a price is far above this
+CTX_SCN = {"a": ("p", "to_atr"), "b": ("p", "pb_atr", "to_atr"), "c": ("p", "to_atr", "ext_atr")}
+
+
 class AggError(ValueError):
     pass
+
+
+def _int_in(v, lo, hi):
+    """int in [lo, hi]; floats only when integral (the EA sends integers)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    if isinstance(v, float) and (not math.isfinite(v) or not v.is_integer()):
+        return None
+    v = int(v)
+    return v if lo <= v <= hi else None
+
+
+def _float_in(v, lo, hi, nd):
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(float(v)):
+        return None
+    v = float(v)
+    return round(v, nd) if lo <= v <= hi else None
+
+
+def _fields(obj, path: str, stripped: set, spec: dict) -> dict:
+    """spec: key -> validator(value) returning the clean value or None. Unknown / invalid keys are noted."""
+    out = {}
+    for k, v in obj.items():
+        val = spec[k](v) if k in spec else None
+        if val is None:
+            _note(stripped, path, k)
+        else:
+            out[k] = val
+    return out
+
+
+def sanitize_ctx(obj, stripped: set, path: str = "data.mkt.ctx") -> dict | None:
+    """Whitelist validator for the EA market context. Every key, range and code is checked; anything else is
+    dropped (key names only are noted). Returns None when nothing valid is left."""
+    if not isinstance(obj, dict):
+        _note(stripped, path.rsplit(".", 1)[0], path.rsplit(".", 1)[1])
+        return None
+    sign = lambda v: _int_in(v, -1, 1) if v in (-1, 1) else None   # noqa: E731
+    atr = lambda v: _float_in(v, -CTX_ATR_MAX, CTX_ATR_MAX, 2)       # noqa: E731
+    pct = lambda v: _int_in(v, 0, 100)                              # noqa: E731
+    out: dict = {}
+    for k, v in obj.items():
+        val = None
+        if k == "tf" and isinstance(v, dict):
+            tfs = {}
+            for tf, row in v.items():
+                if tf not in CTX_TFS or not isinstance(row, dict):
+                    _note(stripped, f"{path}.tf", tf)
+                    continue
+                spec = {f: (lambda x, lo=lo, hi=hi: _int_in(x, lo, hi)) for f, (lo, hi) in CTX_TF_INT.items()}
+                spec.update({f: sign for f in CTX_TF_SIGN})
+                clean = _fields(row, f"{path}.tf.{tf}", stripped, spec)
+                if clean:
+                    tfs[tf] = clean
+            val = tfs or None
+        elif k == "phase":
+            val = v if isinstance(v, str) and CTX_PHASE_RE.match(v) else None
+        elif k == "ref":
+            val = sign(v)
+        elif k == "rev" and isinstance(v, list):
+            codes: list[str] = []
+            for item in v[:64]:
+                if isinstance(item, str) and CTX_REV_RE.match(item):
+                    if item not in codes:
+                        codes.append(item)
+                else:
+                    stripped.add(f"{path}.rev.<invalid>")
+            if len(codes) > CTX_REV_MAX:
+                stripped.add(f"{path}.rev.<truncated>")
+            val = codes[:CTX_REV_MAX]
+        elif k in ("sr_up_atr", "sr_dn_atr"):
+            val = _float_in(v, 0.0, 20.0, 2)                        # the EA caps the S/R distance at 20 ATR
+        elif k == "vol" and isinstance(v, dict):
+            val = _fields(v, f"{path}.vol", stripped, {
+                "atrp": lambda x: _float_in(x, 0.0, 10.0, 2),        # ATR(H1) in % of price
+                "terc": lambda x: x if x in ("L", "N", "H") else None,
+                "rk": pct}) or None
+        elif k == "mv" and isinstance(v, dict):
+            val = _fields(v, f"{path}.mv", stripped, {"h4": atr, "h24": atr}) or None
+        elif k in ("w1", "d1", "h4"):
+            val = v if v in CTX_CANDLES else None
+        elif k == "an" and isinstance(v, dict):
+            val = _fields(v, f"{path}.an", stripped, {"pl": lambda x: _float_in(x, 0.0, 1.0, 2),
+                                                       "ps": lambda x: _float_in(x, 0.0, 1.0, 2),
+                                                       "n": lambda x: _int_in(x, 0, 1000)}) or None
+        elif k == "scn" and isinstance(v, dict):
+            scn: dict = {}
+            for sk, sv in v.items():
+                if sk == "n":
+                    sval = _int_in(sv, 1, 1000)
+                elif sk == "h":
+                    sval = _int_in(sv, 1, 168)
+                elif sk == "none":
+                    sval = pct(sv)
+                elif sk in CTX_SCN and isinstance(sv, dict):
+                    spec = {f: (pct if f == "p" else atr) for f in CTX_SCN[sk]}
+                    sval = _fields(sv, f"{path}.scn.{sk}", stripped, spec)
+                    sval = sval if "p" in sval else None             # a scenario without its probability is useless
+                else:
+                    sval = None
+                if sval is None:
+                    _note(stripped, f"{path}.scn", sk)
+                else:
+                    scn[sk] = sval
+            val = scn if any(s in scn for s in CTX_SCN) else None
+        elif k == "dir_auc":
+            val = _float_in(v, 0.0, 1.0, 3)
+        elif k == "cr":
+            val = v if isinstance(v, str) and CTX_CR_RE.match(v) else None
+        if val is None:
+            _note(stripped, path, k)
+        else:
+            out[k] = val
+    return out or None
 
 
 def _num(v, typ):
@@ -193,8 +323,12 @@ def sanitize_v2(payload: dict, rcfg: dict, now: dt.datetime, acct: str) -> tuple
         day = dt.datetime.fromtimestamp(ts, dt.timezone.utc).date().isoformat()
     out: dict = {"day": day, "periods": {}, "flags": []}
     for k, v in data.items():
-        if k in ("ea", "ver", "reason"):
+        if k in ("ea", "ver"):
             out[k] = mask_secrets(str(v))[:32]
+        elif k == "reason":
+            out[k] = v if v in REASONS else "other"
+            if out[k] == "other":
+                _note(stripped, "data", "reason")
         elif k == "phase":
             out[k] = _phase_key(str(v))
         elif k == "day":
@@ -214,6 +348,10 @@ def sanitize_v2(payload: dict, rcfg: dict, now: dt.datetime, acct: str) -> tuple
                     mkt["sym"] = re.sub(r"[^A-Za-z0-9._#-]", "", str(mv))[:16]
                 elif mk == "move_atr" and _num(mv, float) is not None:
                     mkt["move_atr"] = round(_num(mv, float), 2)
+                elif mk == "ctx":
+                    ctx = sanitize_ctx(mv, stripped)
+                    if ctx:
+                        mkt["ctx"] = ctx
                 else:
                     _note(stripped, "data.mkt", mk)
             out["mkt"] = mkt

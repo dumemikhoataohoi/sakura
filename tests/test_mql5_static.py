@@ -167,6 +167,25 @@ class Mql5StaticTest(unittest.TestCase):
         for forbidden in ("OrderSend", "PositionClose", "PositionModify", "OrderModify", "CTrade", "TRADE_ACTION"):
             self.assertNotIn(forbidden, code)                    # the bridge never trades
 
+    def test_market_ctx_and_heartbeat(self):
+        # bridge 2.4: EA market context (mkt.ctx) + hourly heartbeat report
+        self.assertIn('#define ZGB_VERSION "2.4"', self.mqh)
+        self.assertIn("#define ZGB_HAS_MKTCTX", self.mqh)
+        setter = self._body("void ZGB_SetMarketCtx(const string json_obj)")
+        self.assertIn("ZGB_CTX_MAX", setter)                     # size limit
+        self.assertIn("'{'", setter)                             # one JSON object only
+        self.assertNotIn("' '", setter)                          # no spaces / free text in the allowed charset
+        self.assertIn("ctx", self._body("string ZGB_MarketJson("))
+        timer = self._body("void ZGB_OnTimer(void)")
+        self.assertIn('ZGB_BuildReport("heartbeat", slot_len)', timer)
+        hb = timer[timer.index("2.4 heartbeat") - 200:timer.index('ZGB_BuildReport("heartbeat"')]
+        for cond in ("g_zgbDirtySlot < 0", "g_zgbFlagSlot < 0", "slot != g_zgbRptSlot", "ZGB_CtxFresh(slot_len)"):
+            self.assertIn(cond, hb)                              # never with a pending trade / flag, once per slot
+        self.assertIn("g_zgbRptSlot =", self._body("bool ZGB_BuildReport("))
+        agg = self._body("bool ZGB_BuildAggReport(")
+        self.assertIn("InpGhMaxPayloadBytes", agg)               # payload limit kept: rebuilt without ctx when too big
+        self.assertIn("ZGB_MarketJson(false, false)", agg)
+
     def test_aggregate_payload_has_no_per_trade_fields(self):
         start = self.mqh.index("string ZGB_AggJson(")
         end = self.mqh.index("string ZGB_LogJson(")

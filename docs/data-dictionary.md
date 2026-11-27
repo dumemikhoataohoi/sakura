@@ -116,13 +116,35 @@ most 10):
 
 | key | meaning |
 |---|---|
-| `ea`, `ver`, `reason` | EA name, bridge version, `periodic` / `dayend` / `flag` / `manual` / `deinit` |
+| `ea`, `ver`, `reason` | EA name, bridge version, `periodic` / `dayend` / `flag` / `manual` / `deinit` / `heartbeat` (bridge 2.4: once per slot with no closed trade, carries the market context); any other reason is stored as `other` |
 | `day` | server date of the report (`YYYY-MM-DD`; Exness servers run on UTC) |
 | `phase` | current EA phase name |
 | `eq` | `day_pl_pct` (closed P/L today), `eq_day_pct` (equity vs day start), `float_pct` (open P/L), all % of balance |
-| `mkt` | `sym`, `move_atr` (today's move vs previous D1 close in ATR14(D1) units). No prices. |
+| `mkt` | `sym`, `move_atr` (today's move vs previous D1 close in ATR14(D1) units), optional `ctx` (bridge 2.4, below). No prices. |
 | `periods.day` / `.week` / `.mtd` / `.r30` | aggregate block for today (server day), the rolling last 7 days, month to date, the rolling last 30 days (coordinator input) |
 | `flags[]` | `{key, msg}` raised by the EA with `ZGB_Flag()` (published: keep prices out of `msg`) |
+
+`mkt.ctx`: EA market context (EA161 v1.31 / bridge 2.4), rebuilt on each new M15 bar from the EA's analyst state.
+Only bucketed or relative values: **no prices, no times, no method names**. `scripts/agg.py` (`sanitize_ctx`) checks every
+key, range and code; anything else is dropped and only its key name is logged. Typical size 0.8-1.2 KB.
+
+| key | meaning |
+|---|---|
+| `tf.D1` / `.H4` / `.H1` / `.M15` | last CLOSED bar: `dir` EMA50 slope over 3 bars (-1/0/1), `rsi` RSI14 (0..100), `adx` ADX14 (0..100), `pb` Bollinger %B x 100 (-100..200), `e50` / `e200` close vs EMA50 / EMA200 (-1/1), `ichi` close vs Ichimoku 9/26/52 cloud (-1 below, 0 in, 1 above) |
+| `phase` | EA phase label `D1 band + H4 state + vol tercile` without separators (`[A-Z]{2,8}`, e.g. `SDPBL` = D1 SD, H4 PB, vol L) |
+| `ref` | reference side of the analyst (-1 SELL / 1 BUY): scenarios a/b/c and the `REF:` flags are relative to it |
+| `rev[]` | at most 8 codes `<TF>:<code>`, TF `W1 D1 H4 H1 M15`, code `SWEEP_HI` `SWEEP_LO` (D1: prior-day high/low taken and closed back inside; H1: 20-bar high/low), `PIN_BULL` `PIN_BEAR` `ENGULF_BULL` `ENGULF_BEAR` (closed candle), `DIV_BULL` `DIV_BEAR` (RSI divergence on the last two confirmed fractals, H4/H1); or `REF:R1`..`REF:R9` = EA reversal factors against `ref` (R1 RSI extreme, R2 stochastic extreme, R3 RSI divergence, R4 Bollinger re-entry, R5 stretched run, R6 20-bar sweep, R7 H1 CHoCH, R8 H4 CHoCH, R9 D1/H4 reversal candle). Order: sweeps, candles, divergences, then REF flags (R7, R8, R9 first) |
+| `sr_up_atr`, `sr_dn_atr` | distance to the nearest level above / below (D1 and W1 high/low, D1/H4 fractals, round 50) in ATR(H1), 0..20 |
+| `vol` | `atrp` ATR(H1) in % of price, `terc` H1 ATR percentile tercile `L` / `N` / `H`, `rk` that percentile x 100 |
+| `mv` | `h4`, `h24`: change of the H1 close over the last 4 / 24 hours in ATR(H1) units (to grade earlier forecasts) |
+| `w1`, `d1`, `h4` | last closed candle type: `OTHER ENG_UP ENG_DN PIN_UP PIN_DN INSIDE OUTSIDE DOJI MARU_UP MARU_DN` |
+| `an` | K-NN analogs: `pl` / `ps` share of resolved analogs whose long / short 1-ATR target came first, `n` resolved analogs |
+| `scn` | 3-scenario forecast of the K-NN analogs: `n` analogs (100), `h` horizon (24 h), `a` continuation, `b` pullback then resume, `c` reversal, each `p` (%, int) and signed distances from the price at the report in ATR(H1): `to_atr` median 24 h target, `b.pb_atr` pullback level, `c.ext_atr` extreme against `ref`; `none` % of analogs that reached neither side. Distances are limited to +-50 ATR |
+| `dir_auc` | analog direction AUC (Mann-Whitney of the live `pl` vs the realised first-touch side) over the cases of the last 30 days with a resolved label; ~0.5 = no direction skill |
+| `cr` | crisis layer: `OFF`, `OK` or `BLOCK:<VOL SPREAD GAP NEWS DAYSTOP WEEKSTOP SAMESIDE OTHER>` |
+
+The daily page renders the last context of the day and a scenario log of every report of the day. A `heartbeat` that is
+identical to the previous stored report of that account and day (apart from `ts`) is not stored, so it creates no commit.
 
 Aggregate block (positions that are fully closed, counted at their last exit):
 

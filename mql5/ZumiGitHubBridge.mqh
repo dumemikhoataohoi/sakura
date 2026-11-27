@@ -17,6 +17,11 @@
 //|  ZGB_MethodEnabled / ZGB_ExtraNewsBlock / ZGB_NewsAllowed.       |
 //|  2.3: ZGB_OpenRiskCap(local) = min(local, global.open_risk_pct)  |
 //|  while the global block is active (only tightens, never > local)|
+//|  2.4: ZGB_SetMarketCtx(json) -> mkt.ctx in every report (EA     |
+//|  market context: bucketed / relative values only, no prices),   |
+//|  plus a "heartbeat" report once per InpGhReportEveryMin slot    |
+//|  while the context is fresh and nothing else was sent (reporting|
+//|  only: the bridge still never trades).                          |
 //|  HARD LIMITS stay in the EA: multipliers are clamped to          |
 //|  InpGhMaxRiskMult (default 1.0 = never increase); the EA's max   |
 //|  risk per trade, daily/weekly loss stops and crisis layer are    |
@@ -61,7 +66,9 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.3"
+#define ZGB_VERSION "2.4"
+#define ZGB_HAS_MKTCTX                 // 2.4: ZGB_SetMarketCtx available (EA161 v1.31 tests this)
+#define ZGB_CTX_MAX 1800               // 2.4: max bytes of the mkt.ctx object
 #define ZGB_CTL_CACHE   "zumi_gh_control.json"
 #define ZGB_CTL_STALE_S (72 * 3600)
 #define ZGB_CTL_MAX_TTL (7 * 86400)
@@ -161,6 +168,10 @@ string   g_zgbTrkPhase[];
 datetime g_zgbLastTrack  = 0;
 long     g_zgbDirtySlot  = -1;      // report slot in which the last closing deal was seen
 long     g_zgbFlagSlot   = -1;      // 15-minute slot in which the first pending flag was raised
+string   g_zgbCtx        = "";      // 2.4: last valid market-context object (mkt.ctx)
+datetime g_zgbCtxT       = 0;       // 2.4: GMT when it was set
+bool     g_zgbCtxWarned  = false;
+long     g_zgbRptSlot    = -1;      // 2.4: report slot (InpGhReportEveryMin) of the last report built (heartbeat: at most one report per slot)
 string   g_zgbMapName[];            // method name -> code (local file only)
 string   g_zgbMapCode[];
 long     g_zgbEvT[];                // NFP/CPI/FOMC times (UTC) seen in latest.json, for the news rule
@@ -714,6 +725,7 @@ bool ZGB_Init(void)
    if(InpGhReportMode != 0)
       Print("ZumiGitHubBridge: WARNING InpGhReportMode=1 sends every trade (times, prices, SL/TP). Use it ONLY with a PRIVATE repository.");
    if(GlobalVariableCheck(ZGB_GvName("dayend"))) g_zgbDayEndKey = (int)GlobalVariableGet(ZGB_GvName("dayend"));
+   if(GlobalVariableCheck(ZGB_GvName("rslot"))) g_zgbRptSlot = (long)GlobalVariableGet(ZGB_GvName("rslot"));   // 2.4
    if(!GlobalVariableCheck(ZGB_GvName("ld_t")))
      {
       // first run on this account: report from the start of the current server day
@@ -1220,6 +1232,41 @@ bool ZGB_NewsAllowed(const datetime t_utc)
 //+------------------------------------------------------------------+
 void ZGB_SetPhase(const string phase) { g_zgbPhase = StringSubstr(phase, 0, 48); }
 
+// 2.4: market context for mkt.ctx (EA161 v1.31 calls it on each new M15 bar). Accepted only when it is one JSON object of
+// at most ZGB_CTX_MAX bytes made of [A-Za-z0-9_:.,{}[]"-] (no spaces, no free text); otherwise the last good block is kept.
+// The server (sakura scripts/agg.py) whitelists every key and range again.
+void ZGB_SetMarketCtx(const string json_obj)
+  {
+   int n = StringLen(json_obj);
+   bool ok = (n >= 2 && n <= ZGB_CTX_MAX && StringGetCharacter(json_obj, 0) == '{' && StringGetCharacter(json_obj, n - 1) == '}');
+   int depth = 0, quotes = 0;
+   for(int i = 0; ok && i < n; i++)
+     {
+      ushort ch = StringGetCharacter(json_obj, i);
+      bool alnum = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+      if(!alnum && ch != '_' && ch != ':' && ch != '.' && ch != ',' && ch != '-' && ch != '"' &&
+         ch != '{' && ch != '}' && ch != '[' && ch != ']') ok = false;
+      if(ch == '"') quotes++;
+      if(ch == '{' || ch == '[') depth++;
+      if(ch == '}' || ch == ']') { depth--; if(depth < 0) ok = false; }
+     }
+   if(ok && (depth != 0 || quotes % 2 != 0)) ok = false;
+   if(!ok)
+     {
+      if(!g_zgbCtxWarned) PrintFormat("ZumiGitHubBridge: market context rejected (%d chars), keeping the previous one", n);
+      g_zgbCtxWarned = true;
+      return;
+     }
+   g_zgbCtx = json_obj;
+   g_zgbCtxT = TimeGMT();
+  }
+
+// 2.4: the context is fresh while the EA keeps updating it (ticks flow); no heartbeat over a closed market.
+bool ZGB_CtxFresh(const long slot_len)
+  {
+   return(StringLen(g_zgbCtx) > 0 && (long)TimeGMT() - (long)g_zgbCtxT <= slot_len + 1800);
+  }
+
 void ZGB_Log(const string line)   // phase / analysis log line, sent with the next report
   {
    int n = ArraySize(g_zgbLogMsg);
@@ -1419,8 +1466,9 @@ string ZGB_EquityJson(const bool with_margin = true)
                        ZGB_Num(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 1)));
   }
 
-string ZGB_MarketJson(const bool full = true)
+string ZGB_MarketJson(const bool full = true, const bool with_ctx = true)
   {
+   string ctx = (with_ctx && StringLen(g_zgbCtx) > 0) ? ",\"ctx\":" + g_zgbCtx : "";   // 2.4
    string sym = (StringLen(InpGhMarketSymbol) > 0) ? InpGhMarketSymbol : _Symbol;
    int dg = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
    double bid = SymbolInfoDouble(sym, SYMBOL_BID);
@@ -1440,10 +1488,10 @@ string ZGB_MarketJson(const bool full = true)
    double mv  = (bid > 0 && pc > 0) ? bid - pc : EMPTY_VALUE;
    double mva = (mv != EMPTY_VALUE && atr != EMPTY_VALUE && atr > 0) ? mv / atr : EMPTY_VALUE;
    if(!full)   // aggregate mode: no prices, only the normalised move
-      return(StringFormat("{\"sym\":\"%s\",\"move_atr\":%s}", ZGB_Esc(sym), ZGB_Num(mva, 2)));
-   return(StringFormat("{\"sym\":\"%s\",\"bid\":%s,\"pc\":%s,\"d1_open\":%s,\"atr\":%s,\"move\":%s,\"move_atr\":%s,\"spread\":%s}",
+      return(StringFormat("{\"sym\":\"%s\",\"move_atr\":%s%s}", ZGB_Esc(sym), ZGB_Num(mva, 2), ctx));
+   return(StringFormat("{\"sym\":\"%s\",\"bid\":%s,\"pc\":%s,\"d1_open\":%s,\"atr\":%s,\"move\":%s,\"move_atr\":%s,\"spread\":%s%s}",
                        ZGB_Esc(sym), ZGB_Num(bid, dg), ZGB_Num(pc, dg), ZGB_Num(op, dg), ZGB_Num(atr, dg),
-                       ZGB_Num(mv, dg), ZGB_Num(mva, 3), ZGB_Num((ask > 0 && bid > 0) ? ask - bid : EMPTY_VALUE, dg)));
+                       ZGB_Num(mv, dg), ZGB_Num(mva, 3), ZGB_Num((ask > 0 && bid > 0) ? ask - bid : EMPTY_VALUE, dg), ctx));
   }
 
 // Collects closing deals with ticket > last reported ticket. Returns the trade JSON objects.
@@ -1928,15 +1976,22 @@ bool ZGB_BuildAggReport(const string reason, const long round_sec)
    long ts = (long)TimeGMT();
    if(round_sec > 0) ts -= ts % round_sec;
    string rid = g_zgbAcct + "-" + IntegerToString(ts);
-   string data = StringFormat("{\"ea\":\"Zumi\",\"ver\":\"%s\",\"reason\":\"%s\",\"day\":\"%s\",\"phase\":\"%s\","
-                              "\"eq\":%s,\"mkt\":%s,\"periods\":{\"day\":%s,\"week\":%s,\"mtd\":%s,\"r30\":%s},\"flags\":%s}",
-                              ZGB_VERSION, ZGB_Esc(reason), ZGB_IsoDate(now_srv), ZGB_Esc(g_zgbPhase),
-                              ZGB_EquityJson(false), ZGB_MarketJson(false),
-                              ZGB_AggJson(ps, day0, false), ZGB_AggJson(ps, week0, false), ZGB_AggJson(ps, month0, true),
-                              ZGB_AggJson(ps, r30, false),
-                              ZGB_FlagsJson());
-   string body = StringFormat("{\"event_type\":\"ea_report\",\"client_payload\":{\"v\":2,\"kind\":\"ea_agg\",\"acct\":\"%s\","
-                              "\"rid\":\"%s\",\"part\":1,\"parts\":1,\"ts\":%I64d,\"data\":%s}}", g_zgbAcct, rid, ts, data);
+   string mkt = ZGB_MarketJson(false);
+   string data = "", body = "";
+   for(int pass = 0; pass < 2; pass++)   // 2.4: a body over InpGhMaxPayloadBytes is rebuilt once without mkt.ctx
+     {
+      data = StringFormat("{\"ea\":\"Zumi\",\"ver\":\"%s\",\"reason\":\"%s\",\"day\":\"%s\",\"phase\":\"%s\","
+                          "\"eq\":%s,\"mkt\":%s,\"periods\":{\"day\":%s,\"week\":%s,\"mtd\":%s,\"r30\":%s},\"flags\":%s}",
+                          ZGB_VERSION, ZGB_Esc(reason), ZGB_IsoDate(now_srv), ZGB_Esc(g_zgbPhase),
+                          ZGB_EquityJson(false), mkt,
+                          ZGB_AggJson(ps, day0, false), ZGB_AggJson(ps, week0, false), ZGB_AggJson(ps, month0, true),
+                          ZGB_AggJson(ps, r30, false),
+                          ZGB_FlagsJson());
+      body = StringFormat("{\"event_type\":\"ea_report\",\"client_payload\":{\"v\":2,\"kind\":\"ea_agg\",\"acct\":\"%s\","
+                          "\"rid\":\"%s\",\"part\":1,\"parts\":1,\"ts\":%I64d,\"data\":%s}}", g_zgbAcct, rid, ts, data);
+      if(ZGB_Utf8Len(body) <= (int)MathMax(4000, InpGhMaxPayloadBytes) || StringLen(g_zgbCtx) == 0) break;
+      mkt = ZGB_MarketJson(false, false);
+     }
    if(!ZGB_Enqueue(body, ts, 1)) { Print("ZumiGitHubBridge: could not write the report queue file"); return(false); }
    ArrayResize(g_zgbFlagJson, 0);
    ArrayResize(g_zgbLogMsg, 0);   // log lines are never published in aggregate mode
@@ -1988,8 +2043,13 @@ bool ZGB_BuildReport(const string reason, const long round_sec = 0)
   {
    if(!InpGhEnable || !g_zgbNetOk) return(false);
    if(StringLen(g_zgbToken) == 0) return(false);
-   if(InpGhReportMode == 0) return(ZGB_BuildAggReport(reason, round_sec));
-   return(ZGB_BuildDetailReport(reason));
+   bool ok = (InpGhReportMode == 0) ? ZGB_BuildAggReport(reason, round_sec) : ZGB_BuildDetailReport(reason);
+   if(ok)   // 2.4: one report per slot is enough for the heartbeat
+     {
+      g_zgbRptSlot = (long)TimeGMT() / ((long)MathMax(1, InpGhReportEveryMin) * 60);
+      GlobalVariableSet(ZGB_GvName("rslot"), (double)g_zgbRptSlot);
+     }
+   return(ok);
   }
 
 // DETAIL MODE (schema v1, PRIVATE repositories only): every closing deal, split into parts if needed.
@@ -2197,6 +2257,12 @@ void ZGB_OnTimer(void)
       else if(g_zgbDirtySlot >= 0 && slot > g_zgbDirtySlot)
         {
          if(ZGB_BuildReport("periodic", slot_len)) g_zgbLastReport = now;
+        }
+      else if(g_zgbDirtySlot < 0 && g_zgbFlagSlot < 0 && slot != g_zgbRptSlot && ZGB_CtxFresh(slot_len))
+        {
+         // 2.4 heartbeat: market context once per slot even without a closed trade. Never while a closing deal or a
+         // flag is pending (those go out with their own report at the next boundary, so trade times stay hidden).
+         if(ZGB_BuildReport("heartbeat", slot_len)) g_zgbLastReport = now;
         }
      }
 

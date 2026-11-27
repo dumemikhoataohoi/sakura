@@ -44,6 +44,13 @@ its `ts` is rounded down to that boundary. EA flags go out on the next 15-minute
 `InpGhDayEndHour:InpGhDayEndMinute` (rounded to 15 min). So the public timestamps (report time, commit time) only
 reveal "something closed in the previous slot", never a trade time.
 
+**Heartbeat (2.4).** At the first timer call of each slot the bridge builds a `heartbeat` aggregate report when nothing
+else was built in that slot, no closing deal or flag is pending (those keep their own report at the next boundary, so a
+heartbeat never reveals a trade time) and the market context was updated within the last slot + 30 min (no heartbeats
+over a closed market). The slot of the last report survives restarts (global variable `ZGB_<acct>_rslot`). A report
+over `InpGhMaxPayloadBytes` is rebuilt once without `mkt.ctx`. With an hourly slot this is up to 24 reports a day per
+account; the repository stores each one that changed (one commit each) and skips identical heartbeats.
+
 ## API
 
 | function | use |
@@ -53,6 +60,7 @@ reveal "something closed in the previous slot", never a trade time.
 | `ZGB_ReadLatest(ZgbLatest &out, bool allow_network=true)` | fills `out`; returns `false` ("no data": disabled / tester / no data / stale / parse) so the EA can trade normally |
 | `ZGB_GetNumber(path, v)`, `ZGB_GetString(path, s)` | any field of the cached JSON, e.g. `"series.T10YIE.c5"`, `"events.next.0.ev"` |
 | `ZGB_SetPhase(s)` | current phase (recorded per position at entry, used for per-phase statistics) |
+| `ZGB_SetMarketCtx(json)` | 2.4: market-context object sent as `mkt.ctx` in every report (EA161 v1.31 calls it on each new M15 bar). Accepted only as one JSON object <= 1800 bytes of `[A-Za-z0-9_:.,{}[]"-]`; otherwise the last good block is kept. Fields: see `docs/data-dictionary.md` |
 | `ZGB_Log(s)` | phase/analysis log line: sent only in mode 1 (in mode 0 it is discarded at each report) |
 | `ZGB_Flag(key, msg)` | EA-raised alert: next report (-> alerts PR comment) and Telegram/Discord. In mode 0 `msg` is published: no prices in it |
 | `ZGB_SendReport(reason)` | build a report now (queued; flushed by `ZGB_OnTimer`). In mode 0 prefer the automatic slots |
@@ -123,3 +131,10 @@ error.
 `min(local_cap, global.open_risk_pct)` while the global directive is active, otherwise `local_cap`. It never returns
 more than the local cap, so the control channel can only tighten it (or relax it back to the user's own value).
 EA161 v1.30 uses it for every new entry.
+
+## Market context and heartbeat (bridge 2.4)
+
+`#define ZGB_HAS_MKTCTX` marks the 2.4 API. EA161 v1.31 builds the context from its analyst panel ([PHASE], [TF],
+[CONTEXT], [SCEN], [VOL], [CRISIS]) at each H1 close and refreshes the M15 row on each new M15 bar, then calls
+`ZGB_SetMarketCtx`. It is reporting only: no gate, lot size, SL/TP or exit reads it. An EA compiled with a 2.3 bridge
+simply sends no context.

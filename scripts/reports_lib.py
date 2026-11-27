@@ -173,6 +173,11 @@ def sanitize(payload: dict, rcfg: dict, now: dt.datetime) -> dict:
             val = _str(val, 32) if typ is str else _num(val, typ)
             if val is not None:
                 mkt[key] = val
+    if isinstance(data.get("mkt"), dict) and data["mkt"].get("ctx") is not None:
+        import agg   # same whitelist as the aggregate reports (bridge 2.4 market context)
+        ctx = agg.sanitize_ctx(data["mkt"]["ctx"], set())
+        if ctx:
+            mkt["ctx"] = ctx
 
     out_data = {"trades": trades, "log": logs, "flags": flags}
     for key in ("ea", "ver", "reason", "phase"):

@@ -4,7 +4,8 @@
 * validates and sanitises the payload (hash-only account id, % only, secrets masked);
 * writes reports/YYYY/MM/DD/<acct>_<YYYYMMDDTHHMMSSZ>[_p<i>of<n>].json (idempotent);
 * upserts the exit deals into reports/journal/<acct>/deals.jsonl keyed by deal ticket;
-* writes the UTC dates it touched (one per line) to --dates-out for daily_summary.py.
+* writes the UTC dates it touched (one per line) to --dates-out for daily_summary.py;
+* a "heartbeat" aggregate identical to the previous report of that account/day (apart from ts) is not stored.
 
 Usage:
   python scripts/store_report.py --event "$GITHUB_EVENT_PATH" --dates-out touched.txt
@@ -25,12 +26,28 @@ import reports_lib as rl  # noqa: E402
 from zumi_common import UTC, load_config, mask_secrets, repo_root, set_github_output, utc_now  # noqa: E402
 
 
+def _same_as_previous(root: Path, rep: dict) -> bool:
+    """True when the newest stored aggregate report of this account and day has the same content apart from
+    ts / rid / reason (a heartbeat that changes nothing must not create a file, hence no commit)."""
+    day = dt.date.fromisoformat(rep["data"]["day"])
+    prev = [r for r in rl.load_reports(root, day - dt.timedelta(days=1), day + dt.timedelta(days=1))
+            if r.get("kind") == "ea_agg" and r.get("acct") == rep["acct"] and r.get("data", {}).get("day") == rep["data"]["day"]
+            and r.get("ts", 0) <= rep["ts"]]
+    if not prev:
+        return False
+    strip = lambda d: {k: v for k, v in d.items() if k != "reason"}   # noqa: E731
+    return strip(prev[-1]["data"]) == strip(rep["data"])
+
+
 def store(root: Path, payload: dict, now: dt.datetime | None = None) -> dict:
     now = now or utc_now()
     cfg = load_config(root)
     rep, stripped = rl.sanitize_any(payload, cfg.get("reports", {}), now)
-    path = rl.store_raw(root, rep)
     dates = {dt.datetime.fromtimestamp(rep["ts"], UTC).date()}
+    if rep["kind"] == "ea_agg" and rep["data"].get("reason") == "heartbeat" and _same_as_previous(root, rep):
+        dates.add(dt.date.fromisoformat(rep["data"]["day"]))
+        return {"path": None, "report": rep, "dates": sorted(dates), "stripped": stripped, "unchanged": True}
+    path = rl.store_raw(root, rep)
     if rep["kind"] == "ea_agg":
         dates.add(dt.date.fromisoformat(rep["data"]["day"]))
     else:
@@ -71,7 +88,9 @@ def main(argv: list[str] | None = None) -> int:
     if res["stripped"]:
         # key names only, never values
         print(f"warning: stripped non-aggregate / unknown keys: {', '.join(res['stripped'][:40])}")
-    if rep["kind"] == "ea_agg":
+    if res.get("unchanged"):
+        print(f"heartbeat unchanged since the previous report, not stored acct={rep['acct']} day={rep['data']['day']}")
+    elif rep["kind"] == "ea_agg":
         day = rep["data"]["periods"].get("day", {})
         print(f"stored {res['path'].relative_to(root)} acct={rep['acct']} aggregate day={rep['data']['day']} "
               f"n={day.get('n', 0)}")

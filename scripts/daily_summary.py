@@ -252,6 +252,94 @@ def agg_section(acct: str, label: str, a: dict, rep: dict | None, flags: list[di
     return out
 
 
+SCN_ROWS = (("a", "a continuation"), ("b", "b pullback, then resume"), ("c", "c reversal"))
+
+
+def _ctx(rep: dict) -> dict:
+    return ((rep.get("data") or {}).get("mkt") or {}).get("ctx") or {}
+
+
+def _sd(v) -> str:
+    return "-" if v is None else "BUY" if v > 0 else "SELL"
+
+
+def ctx_section(rep: dict, day_reports: list[dict]) -> list[str]:
+    """EA market context (bridge 2.4 mkt.ctx) of the last report of the day, plus the day's scenario log so
+    forecasts can be graded later. Everything is relative (ATR units, %, codes): no prices."""
+    ctx = _ctx(rep)
+    if not ctx:
+        return []
+    out = [f"#### Market context (EA report {hhmm(rep['ts'])} UTC)", "",
+           "Relative values only (no prices). Context and a risk filter, not a trading signal: the analog direction "
+           "AUC is about 0.5.", ""]
+    facts = []
+    if ctx.get("phase"):
+        facts.append(f"phase `{ctx['phase']}`")
+    if "ref" in ctx:
+        facts.append(f"reference side {_sd(ctx['ref'])}")
+    if ctx.get("cr"):
+        facts.append(f"crisis layer `{ctx['cr']}`")
+    vol = ctx.get("vol") or {}
+    if vol:
+        facts.append(f"ATR(H1) {f(vol.get('atrp'))} % of price (tercile {vol.get('terc', '-')}, rank {vol.get('rk', '-')})")
+    if facts:
+        out += ["; ".join(facts) + ".", ""]
+    tfs = ctx.get("tf") or {}
+    if tfs:
+        side = {1: "above", -1: "below", 0: "in"}
+        out += ["| TF | dir | RSI | ADX | %B x100 | vs EMA50 | vs EMA200 | Ichimoku cloud |", "|---|---|---|---|---|---|---|---|"]
+        for tf in agg.CTX_TFS:
+            r = tfs.get(tf)
+            if r:
+                out.append(f"| {tf} | {r.get('dir', '-')} | {r.get('rsi', '-')} | {r.get('adx', '-')} | {r.get('pb', '-')} | "
+                           f"{side.get(r.get('e50'), '-')} | {side.get(r.get('e200'), '-')} | {side.get(r.get('ichi'), '-')} |")
+        out.append("")
+    line = []
+    cand = [f"{k.upper()} `{ctx[k]}`" for k in ("w1", "d1", "h4") if ctx.get(k)]
+    if cand:
+        line.append("last closed candles " + ", ".join(cand))
+    line.append("patterns " + (", ".join(f"`{c}`" for c in ctx.get("rev") or []) or "none"))
+    if ctx.get("sr_up_atr") is not None or ctx.get("sr_dn_atr") is not None:
+        line.append(f"nearest S/R up {f(ctx.get('sr_up_atr'))} / down {f(ctx.get('sr_dn_atr'))} ATR(H1)")
+    mv = ctx.get("mv") or {}
+    if mv:
+        line.append(f"move over 4 h {f(mv.get('h4'), 2, True)}, over 24 h {f(mv.get('h24'), 2, True)} ATR(H1)")
+    out += ["; ".join(line) + ".", ""]
+    an = ctx.get("an") or {}
+    if an or ctx.get("dir_auc") is not None:
+        out += [f"Analogs: P(long target first) {f(an.get('pl'))}, P(short first) {f(an.get('ps'))} over {an.get('n', '-')} "
+                f"resolved; direction AUC over 30 days {f(ctx.get('dir_auc'), 3)}.", ""]
+    scn = ctx.get("scn") or {}
+    if scn:
+        out += [f"Scenario forecast ({scn.get('n', '-')} analogs, {scn.get('h', '-')} h; signed distances from the price at the "
+                f"report in ATR(H1)):", "",
+                "| scenario | p % | pullback | target | extreme |", "|---|---|---|---|---|"]
+        for k, name in SCN_ROWS:
+            s = scn.get(k)
+            if s:
+                out.append(f"| {name} | {s.get('p', '-')} | {f(s.get('pb_atr'), 2, True)} | {f(s.get('to_atr'), 2, True)} | "
+                           f"{f(s.get('ext_atr'), 2, True)} |")
+        if scn.get("none") is not None:
+            out.append(f"| none of these | {scn['none']} | - | - | - |")
+        out.append("")
+    log = {}
+    for r in day_reports:
+        if _ctx(r).get("scn"):
+            log[r["ts"]] = r
+    if len(log) > 1:
+        out += ["Scenario log of the day (grade each row with the `mv` 24 h move of a report 24 h later):", "",
+                "| UTC | phase | ref | a p / target | b p / pullback / target | c p / target / extreme | none | 24 h move so far |",
+                "|---|---|---|---|---|---|---|---|"]
+        for ts in sorted(log)[-30:]:
+            c = _ctx(log[ts]); s = c["scn"]; a, b, cc = s.get("a") or {}, s.get("b") or {}, s.get("c") or {}
+            out.append(f"| {hhmm(ts)} | {c.get('phase', '-')} | {_sd(c.get('ref'))} | {a.get('p', '-')} / {f(a.get('to_atr'), 2, True)} | "
+                       f"{b.get('p', '-')} / {f(b.get('pb_atr'), 2, True)} / {f(b.get('to_atr'), 2, True)} | "
+                       f"{cc.get('p', '-')} / {f(cc.get('to_atr'), 2, True)} / {f(cc.get('ext_atr'), 2, True)} | "
+                       f"{s.get('none', '-')} | {f((c.get('mv') or {}).get('h24'), 2, True)} |")
+        out.append("")
+    return out
+
+
 def agg_reports(root: Path, first: dt.date, last: dt.date) -> list[dict]:
     return [r for r in rl.load_reports(root, first, last) if r.get("kind") == "ea_agg"]
 
@@ -313,6 +401,7 @@ def summarize(root: Path, dates: list[dt.date], cfg: dict | None = None) -> list
                      for fl in x["data"].get("flags", [])}
             parts[acct] = agg_section(acct, f"day {day.isoformat()}", r["data"]["periods"].get("day", {"n": 0}), r,
                                       [flags[k] for k in sorted(flags)])
+            parts[acct] += ctx_section(r, [x for x in reps if x["acct"] == acct and x["data"]["day"] == day.isoformat()])
         text = render_page(f"Zumi daily report {day.isoformat()} (UTC)", "daily", per, cfg, events, extras, hist, parts)
         path = root / "reports" / "daily" / f"{day.isoformat()}.md"
         if write_if_changed(path, text):
