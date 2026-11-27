@@ -23,6 +23,7 @@ Cập nhật lần cuối: 2026-11-27.
 | A12 | **Hướng tới ≥100 lệnh/tháng** (yêu cầu 2026-11-27) sau điều phối, vẫn giữ: không hedge, rủi ro ≤1%/lệnh, có lãi sau phí, chỉ số rủi ro không tệ hơn bản đang chạy. Mốc hiện tại: v1.40 ~25 lệnh/tháng; biên mô phỏng khi cấm hedge tối đa ~51 lệnh/tháng (v1.39) → cần họ phương pháp giữ lệnh ngắn, cùng chiều khung định hướng | ❌ |
 | A13 | **Cổng dựng bản mới (2026-11-27):** tiếp tục ở dạng MÔ PHỎNG; chỉ dựng EA khi bản mới **tốt hơn v1.40 nhiều** VÀ đạt **≥100 lệnh/tháng**, các yếu tố khác (lãi, tỉ lệ thắng, sụt giảm, chuỗi thua, ngày lỗ nặng nhất, tháng lỗ, ngày có lệnh, ngày có lãi) không kém v1.40 | 🟡 v1.43 đang nghiên cứu (giảm thời gian giữ lệnh, đảo chiều, vào lại, mở rộng S4) |
 | A14 | **Tăng dần, không cần đạt ngay ≥100 lệnh/tháng** (2026-11-27): mỗi bản mới tăng số lệnh từng bước (≥ +20% so với bản trước) và không kém v1.40 ở lãi, tỉ lệ thắng (≤ −1 điểm), sụt giảm, chuỗi thua (≤ 9), ngày lỗ nặng nhất (≥ −3R), tháng lỗ, tỉ lệ ngày có lãi; 100 lệnh/tháng là mục tiêu dài hạn | 🟡 v1.44 (mở rộng S4) |
+| A15 | **Tỉ lệ thắng chỉ cần ≥ 60%** (2026-11-27), không bắt buộc ≥ bản trước; vẫn hướng tới 100 lệnh/tháng. Cổng dựng từng bước dùng: thắng ≥ 60% thay cho "≥ v1.40 − 1 điểm" | 🟡 áp dụng từ v1.48 |
 | A8 | Được giữ lệnh qua cuối tuần và quá 1440 phút | ✅ |
 
 ## B. Phân tích thị trường (EA và Claude)
