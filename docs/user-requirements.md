@@ -83,3 +83,4 @@ Cập nhật lần cuối: 2026-11-27.
 | F4 | Kiên nhẫn, không làm ẩu; ý tưởng của người khác chỉ dùng để tham khảo, không giảng giải triết lý giao dịch | ✅ |
 | F5 | Bảo mật: không đưa token, số tài khoản, email lên repo hay vào chat; repo công khai chỉ nhận báo cáo tổng hợp | ✅ |
 | F6 | **Rà soát file này trước khi điều phối hoặc nâng cấp; mục nào 🟡 hoặc ❌ thì nêu trong báo cáo** | ✅ |
+| F7 | Cách báo cáo: **hướng giải pháp**. Mỗi điểm yếu luôn đi kèm cách cải thiện cụ thể và việc đang làm; không chỉ nói "không tốt". Số liệu vẫn phải thật | ✅ |
