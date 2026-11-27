@@ -234,6 +234,16 @@ Split into parts when larger than `InpGhMaxPayloadBytes`.
   `days_traded_7d` / `_30d`, `profitable_days_7d` / `_30d` (day blocks with `net_pct` > 0), `reported_days_*`,
   `weekdays_*`, `cur_losing_streak`, `dd_week_pct`, `dd_mtd_pct`. EA ages are open-market hours (gold closed Friday
   21:00 to Sunday 23:00 UTC). Rewritten only when a status, a reason or a KPI changes. Aggregate data only.
+  `kpi.departments[]` / `kpi.company.<acct>[]` (requirement E5, `docs/agents.md` section 6): `id`, `dept`, `kpi`, `scope`
+  (account hash or `repo`), `value`, `n` (sample), `window_d`, `op` / `target` / `warn` (pre-registered in
+  `config/settings.json` > `agents_kpi`), `status` (OK at the target, WARN within `warn`, FAIL beyond, SKIP = not
+  measurable from repo files, no data or `n < min_n`), `reason`, `trend.7d` / `trend.30d` = `{cur, prev, delta, dir
+  up/down/flat/n/a, better}` (the last 7 / 30 days versus the 7 / 30 days before; |delta| <= `flat` = flat). Company
+  block: net R 7 / 30 days, % weekdays with trades (from the first stored report on), % profitable days, MTD drawdown,
+  win% after coordination, coordination lift = win% of the real trades minus win% of the `shadow` CTRL signals (pp).
+  Repo KPIs: control refresh overdue > 48 h (`control/CHANGELOG.md`), data freshness replayed on `data/history`, summary
+  pages present, `control.json` valid, stored reports that would not pass `agg.sanitize_v2` unchanged (privacy).
+  Optional `agents_kpi.scenario_ledger` CSV (`date,hit`) feeds the analyst hit rate.
 * `docs/dashboard/data.json` (`aggregates`): per account the daily series, the latest `week` and `mtd`, per-month `mtd`
   blocks, an all-time merge, and the `mtd` method/phase/grid tables.
 

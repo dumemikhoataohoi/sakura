@@ -198,5 +198,177 @@
     "side_window_days": 14,
     "side_min_n": 30,
     "side_ub_pct": 45.0
+  },
+  "agents_kpi": {
+    "_doc": "Pre-registered KPI targets (docs/agents.md section 6, requirement E5) for scripts/agents_status.py. op '>=' : OK at >= target, WARN at >= warn, else FAIL; op '<=' mirrored. window = primary window in days (the status uses it); trend compares the last 7 / 30 days with the 7 / 30 days before; |delta| <= flat = flat; min_n = sample below which the status is SKIP. Change targets only by a reviewed commit, never to make a KPI pass.",
+    "scenario_ledger": "reports/scenario_ledger.csv",
+    "kpis": {
+      "exec.lift_pp": {
+        "op": ">=",
+        "target": 10.0,
+        "warn": 0.0,
+        "window": 30,
+        "flat": 1.0,
+        "min_n": 20
+      },
+      "exec.control_overdue_48h": {
+        "op": "<=",
+        "target": 0,
+        "warn": 1,
+        "window": 30,
+        "flat": 0.0
+      },
+      "analyst.scenario_hit_pct": {
+        "op": ">=",
+        "target": 50.0,
+        "warn": 40.0,
+        "window": 30,
+        "flat": 1.0,
+        "min_n": 20
+      },
+      "signal.trades": {
+        "op": ">=",
+        "target": 100,
+        "warn": 50,
+        "window": 30,
+        "flat": 1.0
+      },
+      "signal.days_traded_pct": {
+        "op": ">=",
+        "target": 90.0,
+        "warn": 70.0,
+        "window": 30,
+        "flat": 1.0
+      },
+      "signal.avg_r": {
+        "op": ">=",
+        "target": 0.05,
+        "warn": 0.0,
+        "window": 30,
+        "flat": 0.01,
+        "min_n": 20
+      },
+      "risk.dd_week_pct": {
+        "op": "<=",
+        "target": 3.0,
+        "warn": 5.0,
+        "window": 7,
+        "flat": 0.1
+      },
+      "risk.dd_month_pct": {
+        "op": "<=",
+        "target": 5.0,
+        "warn": 8.0,
+        "window": 30,
+        "flat": 0.1
+      },
+      "risk.worst_day_r": {
+        "op": ">=",
+        "target": -3.0,
+        "warn": -3.0,
+        "window": 30,
+        "flat": 0.1
+      },
+      "risk.max_losing_streak": {
+        "op": "<=",
+        "target": 6,
+        "warn": 9,
+        "window": 30,
+        "flat": 0.0
+      },
+      "risk.hard_violations": {
+        "op": "<=",
+        "target": 0,
+        "warn": 0,
+        "window": 30,
+        "flat": 0.0
+      },
+      "shadow.cells_n30_pct": {
+        "op": ">=",
+        "target": 100.0,
+        "warn": 50.0,
+        "window": 30,
+        "flat": 1.0
+      },
+      "data.fresh_days_pct": {
+        "op": ">=",
+        "target": 100.0,
+        "warn": 90.0,
+        "window": 30,
+        "flat": 1.0
+      },
+      "finance.pages_on_time_pct": {
+        "op": ">=",
+        "target": 100.0,
+        "warn": 90.0,
+        "window": 30,
+        "flat": 1.0
+      },
+      "legal.control_valid_pct": {
+        "op": ">=",
+        "target": 100.0,
+        "warn": 100.0,
+        "window": 30,
+        "flat": 0.0
+      },
+      "legal.privacy_leaks": {
+        "op": "<=",
+        "target": 0,
+        "warn": 0,
+        "window": 30,
+        "flat": 0.0
+      },
+      "company.net_r_week": {
+        "op": ">=",
+        "target": 0.0,
+        "warn": -3.0,
+        "window": 7,
+        "flat": 0.1
+      },
+      "company.net_r_month": {
+        "op": ">=",
+        "target": 0.0,
+        "warn": -5.0,
+        "window": 30,
+        "flat": 0.1
+      },
+      "company.days_traded_pct": {
+        "op": ">=",
+        "target": 90.0,
+        "warn": 70.0,
+        "window": 30,
+        "flat": 1.0
+      },
+      "company.profitable_days_pct": {
+        "op": ">=",
+        "target": 60.0,
+        "warn": 45.0,
+        "window": 30,
+        "flat": 1.0
+      },
+      "company.dd_month_pct": {
+        "op": "<=",
+        "target": 5.0,
+        "warn": 8.0,
+        "window": 30,
+        "flat": 0.1
+      },
+      "company.win_pct": {
+        "op": ">=",
+        "target": 55.0,
+        "warn": 50.0,
+        "window": 30,
+        "flat": 1.0,
+        "min_n": 20
+      },
+      "company.lift_pp": {
+        "op": ">=",
+        "target": 10.0,
+        "warn": 0.0,
+        "window": 30,
+        "flat": 1.0,
+        "min_n": 20
+      }
+    }
   }
 }
