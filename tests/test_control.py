@@ -35,6 +35,20 @@ class ValidatorTest(unittest.TestCase):
         self.assertIsNone(norm)
         self.assertTrue(any(fragment in e for e in errors), errors)
 
+    def test_open_risk_pct(self):
+        norm, _ = self.ok(base())
+        self.assertNotIn("open_risk_pct", norm["global"])                      # omitted = EA local value
+        norm, _ = self.ok(base(**{"global": {"risk_mult": 1.0, "pause_all": False, "open_risk_pct": 8,
+                                             "reason_code": "R05"}}))
+        self.assertEqual(norm["global"]["open_risk_pct"], 8.0)
+        eff = control.effective(norm, NOW)
+        self.assertEqual(eff["global"]["open_risk_pct"], 8.0)
+        self.assertFalse(eff["neutral"])
+        self.bad(base(**{"global": {"open_risk_pct": 25, "reason_code": "R05"}}), "open_risk_pct")
+        self.bad(base(**{"global": {"open_risk_pct": 0.5, "reason_code": "R05"}}), "open_risk_pct")
+        self.bad(base(**{"global": {"open_risk_pct": True, "reason_code": "R05"}}), "open_risk_pct")
+        self.bad(base(**{"global": {"open_risk_pct": 8}}), "reason")              # needs a reason code
+
     def test_defaults_and_expiry(self):
         norm, _ = self.ok(base(methods={"M003": {"mode": "pause", "reason_code": "R01"}}))
         self.assertEqual(norm["global"]["expires_utc"], "2026-11-27T16:00:00Z")          # default 48 h

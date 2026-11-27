@@ -61,7 +61,8 @@ METHOD_RE = re.compile(r"^M\d{3}$")
 PHASE_RE = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 PRICE_RE = re.compile(r"\d+[.,]\d+|\b(?!20\d\d\b)\d{4,}\b")
 TOP_KEYS = {"v", "author", "seq", "updated_utc", "updated_unix", "global", "methods", "news_blocks", "notes_vi"}
-GLOBAL_KEYS = {"risk_mult", "pause_all", "expires_utc", "expires_unix", "reason_code"}
+GLOBAL_KEYS = {"risk_mult", "pause_all", "open_risk_pct", "expires_utc", "expires_unix", "reason_code"}
+OPEN_RISK_MIN, OPEN_RISK_MAX = 1.0, 20.0   # % of balance; the EA applies min(its local cap, this)
 METHOD_KEYS = {"mode", "risk_mult", "phases", "reason_code", "expires_utc", "expires_unix"}
 WINDOW_KEYS = {"kind", "start_utc", "start_unix", "end_utc", "end_unix", "reason_code"}
 
@@ -152,12 +153,21 @@ def normalize(obj, now: dt.datetime | None = None) -> tuple[dict | None, list[st
     pause_all = g.get("pause_all", False)
     if not isinstance(pause_all, bool):
         errors.append("global.pause_all must be true/false")
+    orp = g.get("open_risk_pct")
+    if orp is not None:
+        if isinstance(orp, bool) or not isinstance(orp, (int, float)) or not OPEN_RISK_MIN <= orp <= OPEN_RISK_MAX:
+            errors.append(f"global.open_risk_pct must be a number in [{OPEN_RISK_MIN}, {OPEN_RISK_MAX}]")
+            orp = None
+        else:
+            orp = round(float(orp), 2)
     gexp = _expiry(g.get("expires_utc"), updated, "global.expires_utc", errors, warnings)
-    non_neutral = (gm is not None and gm != 1.0) or pause_all is True
+    non_neutral = (gm is not None and gm != 1.0) or pause_all is True or orp is not None
     greason = _reason(g.get("reason_code"), "global.reason_code", errors, required=non_neutral)
     out["global"] = {"risk_mult": gm, "pause_all": pause_all is True, "reason_code": greason,
                      "expires_utc": iso_z(gexp) if gexp else None,
                      "expires_unix": int(gexp.timestamp()) if gexp else None}
+    if orp is not None:
+        out["global"]["open_risk_pct"] = orp
 
     methods = obj.get("methods", {})
     if not isinstance(methods, dict):
@@ -265,6 +275,8 @@ def effective(norm: dict | None, now: dt.datetime) -> dict:
     g = norm["global"]
     if g["expires_unix"] and ts < g["expires_unix"]:
         out["global"] = {"risk_mult": g["risk_mult"], "pause_all": g["pause_all"]}
+        if g.get("open_risk_pct") is not None:
+            out["global"]["open_risk_pct"] = g["open_risk_pct"]
     out["methods"] = {c: d for c, d in norm["methods"].items() if ts < d["expires_unix"]}
     out["news_blocks"] = [w for w in norm["news_blocks"] if ts < w["end_unix"]]
     out["neutral"] = (out["global"] == neutral["global"] and not out["methods"] and not out["news_blocks"])
@@ -298,6 +310,9 @@ def changes(prev: dict | None, new: dict) -> list[str]:
         out.append(f"global risk_mult {pg.get('risk_mult', 1.0):.2f}->{ng['risk_mult']:.2f} ({ng['reason_code']})")
     if pg.get("pause_all") != ng["pause_all"]:
         out.append(f"global pause_all {str(ng['pause_all']).lower()} ({ng['reason_code']})")
+    if pg.get("open_risk_pct") != ng.get("open_risk_pct"):
+        v = ng.get("open_risk_pct")
+        out.append(f"global open_risk_pct {'EA default' if v is None else f'{v:.2f}%'} ({ng['reason_code']})")
     pm = (prev or {}).get("methods") or {}
     for code, d in new["methods"].items():
         if code not in pm or {k: v for k, v in pm[code].items()} != d:
