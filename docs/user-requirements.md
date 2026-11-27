@@ -69,6 +69,7 @@ Cập nhật lần cuối: 2026-11-27.
 | D6 | **Mọi nghiên cứu và nâng cấp EA phải theo đúng `docs/research-protocol.md`** (đọc lại 4 ngày gần nhất, đối chứng, walk-forward 12 tháng→1 tháng, kiểm tra cuối, bảng trạng thái × phương pháp, đo riêng từng tầng, báo cáo bảng §9). Làm thật chặt từ nay trở đi | ✅ Áp dụng từ 27/11 |
 | D7 | **Bản mới bắt buộc phải tốt hơn S4** (lõi chế độ 0): nhiều lệnh hơn, lãi ròng ≥ S4, DD và ngày/tuần/tháng lỗ không tệ hơn (hoặc nêu rõ đánh đổi). So sánh trên cùng dữ liệu và chi phí. Không đạt thì không dựng | ✅ Áp dụng từ v1.35 |
 | D8 | **Tiêu chí duyệt phương pháp**: sau các tầng điều phối, tỉ lệ thắng (1R) phải **≥70%** trên kiểm tra ngoài mẫu (bỏ từng tháng) thì mới được chạy; **ưu tiên ≥80%**. Phương pháp gốc 12 tháng có thể chỉ khoảng **55%** nếu điều phối nâng lên ≥70%. Đạt 70% chỉ trên dữ liệu đã chỉnh thì ghi "chỉ trong mẫu", chưa duyệt | ✅ Áp dụng từ v1.35 |
+| D9 | **Thứ tự ưu tiên khi nghiên cứu phương pháp**: trước hết tìm cách làm chính phương pháp đạt **70%** (tinh chỉnh điểm vào, SL, thời điểm, điều kiện thị trường...). Chỉ khi không đạt mới hạ xuống 65%, rồi 60%, cuối cùng 55%, sau đó mới nhờ điều phối nâng lên ≥70%. Nghiên cứu hết sức, ghi lại mọi phương án đã thử, không làm qua loa | ✅ Áp dụng từ v1.35b |
 
 ## E. Demo → tiền thật
 
