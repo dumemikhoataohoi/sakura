@@ -23,6 +23,9 @@ void OnTradeTransaction(const MqlTradeTransaction &t, const MqlTradeRequest &q, 
 4. Inputs: `InpGhEnable=true`, `InpGhOwner`/`InpGhRepo`, your own private `InpGhAccountSalt`, the token (input
    `InpGhToken` or first line of `MQL5\Files\zumi_gh_token.txt`), and **keep `InpGhReportMode=0`** for this public repo.
    Never put the token in source code or in the repository.
+5. Reports count only the host EA's trades when the EA calls `ZGB_SetMagicRange(lo, hi)` before `ZGB_Init()`
+   (EA161 uses `InpMagicBase .. InpMagicBase+9999`). Without it (bridge 2.1 behaviour) every trade on the account
+   matching `InpGhMagicFilter`/`InpGhSymbolFilter` is counted, including other EAs and manual trades.
 
 ## Report modes
 

@@ -59,7 +59,7 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.1"
+#define ZGB_VERSION "2.2"
 #define ZGB_CTL_CACHE   "zumi_gh_control.json"
 #define ZGB_CTL_STALE_S (72 * 3600)
 #define ZGB_CTL_MAX_TTL (7 * 86400)
@@ -126,6 +126,8 @@ struct ZgbLatest
   };
 
 //--- internal state
+long     g_zgbMagicLo    = -1;      // 2.2: report only magics in [lo, hi] (set by the EA, ZGB_SetMagicRange); -1 = no range
+long     g_zgbMagicHi    = -1;
 string   g_zgbToken      = "";
 string   g_zgbAcct       = "";
 bool     g_zgbNetOk      = false;   // false in tester / after a 4014/4060 error
@@ -1276,8 +1278,16 @@ void ZGB_TrkRemove(const long pos)
    ArrayResize(g_zgbTrkMax, last); ArrayResize(g_zgbTrkPhase, last);
   }
 
+// 2.2: the EA declares its own magic span so reports never count other EAs or manual trades (magic 0); no new input.
+void ZGB_SetMagicRange(long lo, long hi)
+  {
+   if(lo < 0 || hi < lo) { g_zgbMagicLo = -1; g_zgbMagicHi = -1; return; }
+   g_zgbMagicLo = lo; g_zgbMagicHi = hi;
+  }
+
 bool ZGB_PassFilter(const string sym, const long magic)
   {
+   if(g_zgbMagicLo >= 0 && (magic < g_zgbMagicLo || magic > g_zgbMagicHi)) return(false);
    if(InpGhMagicFilter >= 0 && magic != InpGhMagicFilter) return(false);
    if(StringLen(InpGhSymbolFilter) > 0 && sym != InpGhSymbolFilter) return(false);
    return(true);
