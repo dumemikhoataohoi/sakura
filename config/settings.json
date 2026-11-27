@@ -200,7 +200,7 @@
     "side_ub_pct": 45.0
   },
   "agents_kpi": {
-    "_doc": "Pre-registered KPI targets (docs/agents.md section 6, requirement E5) for scripts/agents_status.py. op '>=' : OK at >= target, WARN at >= warn, else FAIL; op '<=' mirrored. window = primary window in days (the status uses it); trend compares the last 7 / 30 days with the 7 / 30 days before; |delta| <= flat = flat; min_n = sample below which the status is SKIP. Change targets only by a reviewed commit, never to make a KPI pass.",
+    "_doc": "Pre-registered KPI targets (docs/agents.md section 6, requirement E5) for scripts/agents_status.py. op '>=' : OK at >= target, WARN at >= warn, else FAIL; op '<=' mirrored. window = primary window in days (the status uses it); trend compares the last 7 / 30 days with the 7 / 30 days before; |delta| <= flat = flat; min_n = sample below which the status is SKIP. Change targets only by a reviewed commit, never to make a KPI pass. roles: department -> role of docs/agents.md 6.1 (chức vụ). step / step_kind / cap: the 6.2 ratchet.",
     "scenario_ledger": "reports/scenario_ledger.csv",
     "kpis": {
       "exec.lift_pp": {
@@ -209,7 +209,10 @@
         "warn": 0.0,
         "window": 30,
         "flat": 1.0,
-        "min_n": 20
+        "min_n": 20,
+        "step": 1.0,
+        "step_kind": "abs",
+        "cap": 30.0
       },
       "exec.control_overdue_48h": {
         "op": "<=",
@@ -231,14 +234,19 @@
         "target": 100,
         "warn": 50,
         "window": 30,
-        "flat": 1.0
+        "flat": 1.0,
+        "step": 0.05,
+        "step_kind": "pct"
       },
       "signal.days_traded_pct": {
         "op": ">=",
         "target": 90.0,
         "warn": 70.0,
         "window": 30,
-        "flat": 1.0
+        "flat": 1.0,
+        "step": 2.0,
+        "step_kind": "abs",
+        "cap": 100.0
       },
       "signal.avg_r": {
         "op": ">=",
@@ -337,14 +345,20 @@
         "target": 90.0,
         "warn": 70.0,
         "window": 30,
-        "flat": 1.0
+        "flat": 1.0,
+        "step": 2.0,
+        "step_kind": "abs",
+        "cap": 100.0
       },
       "company.profitable_days_pct": {
         "op": ">=",
         "target": 60.0,
         "warn": 45.0,
         "window": 30,
-        "flat": 1.0
+        "flat": 1.0,
+        "step": 2.0,
+        "step_kind": "abs",
+        "cap": 100.0
       },
       "company.dd_month_pct": {
         "op": "<=",
@@ -369,6 +383,24 @@
         "flat": 1.0,
         "min_n": 20
       }
+    },
+    "roles": {
+      "Executive (Claude Coordinator)": "Tổng giám đốc (CEO)",
+      "Analysis (Claude Analyst, EA Market)": "Trưởng phân tích",
+      "Production (EA Signal)": "Giám đốc sản xuất (Trưởng phòng tín hiệu)",
+      "Risk (EA Risk)": "Giám đốc rủi ro (CRO)",
+      "Operations (EA Execution)": "Giám đốc vận hành (COO)",
+      "Audit (EA Shadow)": "Kiểm toán nội bộ",
+      "Data (GitHub Data + Quality)": "Dữ liệu & hạ tầng",
+      "Finance (GitHub Analytics)": "Giám đốc tài chính (CFO)",
+      "Legal (GitHub Guard)": "Pháp chế & bảo mật",
+      "R&D (Claude Researcher, Builder, Reviewer)": "Giám đốc công nghệ & R&D (CTO)",
+      "Owner relations (Claude Reporter)": "Quan hệ chủ sở hữu",
+      "Company": "Giám đốc tài chính (CFO)"
+    },
+    "ratchet": {
+      "weeks": 4,
+      "_doc": "docs/agents.md 6.2: a KPI that meets its target 4 ISO weeks in a row gets next week's target = best weekly value of those weeks moved by step in the better direction (step_kind pct: x(1 +/- step), abs: +/- step), clamped to cap; targets only ever tighten (the configured target is the floor); risk KPIs (risk.*, company.dd_month_pct) only tighten or hold; no step = hold."
     }
   },
   "vault": {

@@ -243,7 +243,19 @@ Split into parts when larger than `InpGhMaxPayloadBytes`.
   win% after coordination, coordination lift = win% of the real trades minus win% of the `shadow` CTRL signals (pp).
   Repo KPIs: control refresh overdue > 48 h (`control/CHANGELOG.md`), data freshness replayed on `data/history`, summary
   pages present, `control.json` valid, stored reports that would not pass `agg.sanitize_v2` unchanged (privacy).
-  Optional `agents_kpi.scenario_ledger` CSV (`date,hit`) feeds the analyst hit rate.
+  Optional `agents_kpi.scenario_ledger` CSV (`date,hit`) feeds the analyst hit rate. Each KPI row also carries `role`
+  (chức vụ, `agents_kpi.roles`, `docs/agents.md` 6.1), `floor` and `weeks_met`; `kpi.review[]` is the weekly review:
+  `dept`, `role`, `weeks_failed` (consecutive complete ISO weeks with a measured KPI of the department missing its
+  target), `last_week`, `last_outcome`, `flag` = `cần kế hoạch cải tiến` at 2 or more.
+* `reports/agents/kpi_state.json` (schema `zumi.kpi_state` v1, written through `scripts/vault.py` only when it changes):
+  the KPI ratchet of `docs/agents.md` 6.2. `last_week` / `last_week_end` (last processed complete ISO week; a new state
+  starts with the last `agents_kpi.ratchet.weeks` weeks, a late run catches up at most 8), per `"<kpi id>@<scope>"`:
+  `floor` (the configured target), `current_target`, `weeks_met`, `streak` (values of the current met run), `risk`,
+  `history[]` (last 8 weeks: `week`, `value`, `target`, `outcome` met / missed / n/a, `raised_to`); per department
+  `weeks_failed` and `history[]`. Weekly value = the KPI over its primary window ending on the week's Sunday. After
+  `weeks` (4) met weeks in a row the target becomes the best weekly value of the run moved by `step` (`step_kind` pct or
+  abs, clamped to `cap`) in the better direction; it never becomes looser than the current target or the floor, so risk
+  KPIs (`risk.*`, `company.dd_month_pct`) only tighten or hold; no step = hold.
 * `docs/dashboard/data.json` (`aggregates`): per account the daily series, the latest `week` and `mtd`, per-month `mtd`
   blocks, an all-time merge, and the `mtd` method/phase/grid tables.
 

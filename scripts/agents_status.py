@@ -714,11 +714,14 @@ def trend(fn, today: dt.date, w: int, spec: dict | None) -> dict:
 
 
 def kpi_entry(kid: str, dept: str, label: str, scope: str, fn, today: dt.date, specs: dict,
-              window: int | None = None, skip: str | None = None, metric: str = "") -> dict:
+              window: int | None = None, skip: str | None = None, metric: str = "", role: str = "-",
+              ratchet: dict | None = None) -> dict:
     spec = specs.get(kid)
-    out = {"id": kid, "dept": dept, "kpi": label, "scope": scope}
+    out = {"id": kid, "dept": dept, "role": role, "kpi": label, "scope": scope}
     if skip:
         return dict(out, status="SKIP", reason=skip)
+    if spec and ratchet:                                 # 6.2: status against the ratcheted target (never looser than the floor)
+        spec = dict(spec, target=ratchet["current_target"])
     w = int(window or (spec or {}).get("window", 30))
     value, n = fn(today, w)
     st, reason = kpi_status(value, n, spec, metric)
@@ -726,11 +729,128 @@ def kpi_entry(kid: str, dept: str, label: str, scope: str, fn, today: dt.date, s
                trend={f"{tw}d": trend(fn, today, tw, spec) for tw in TRENDS})
     if spec:
         out.update(op=spec["op"], target=spec["target"], warn=spec.get("warn", spec["target"]))
+    if ratchet:
+        out.update(floor=ratchet["floor"], weeks_met=ratchet["weeks_met"])
     return out
 
 
-def department_kpis(root: Path, now: dt.datetime, cfg: dict) -> dict:
-    specs = (cfg.get("agents_kpi") or {}).get("kpis") or {}
+# ---------------------------------------------------------------- KPI ratchet (docs/agents.md 6.2) and weekly review
+STATE_PATH = OUT_DIR / "kpi_state.json"
+STATE_SCHEMA = "zumi.kpi_state"
+STATE_HISTORY_WEEKS = 8          # weeks of history kept per KPI / department; also the longest catch-up
+RISK_KPIS = ("risk.dd_week_pct", "risk.dd_month_pct", "risk.worst_day_r", "risk.max_losing_streak", "risk.hard_violations",
+             "company.dd_month_pct")
+IMPROVE_FLAG = "cần kế hoạch cải tiến"
+IMPROVE_AFTER_WEEKS = 2
+
+
+def _stricter(a: float, b: float, op: str) -> float:
+    return max(a, b) if op == ">=" else min(a, b)
+
+
+def _meets(v: float, t: float, op: str) -> bool:
+    return v >= t if op == ">=" else v <= t
+
+
+def iso_week(d: dt.date) -> str:
+    y, w, _ = d.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def last_week_end(today: dt.date) -> dt.date:
+    """Sunday of the last complete ISO week before `today`."""
+    return today - dt.timedelta(days=today.weekday() + 1)
+
+
+def raised_target(kid: str, spec: dict, current: float, values: list[float]) -> float:
+    """Best weekly value of the met streak moved one step in the better direction, clamped to cap, never looser than the
+    current target. A risk KPI therefore only tightens or holds; a missing / zero / negative step holds."""
+    op = spec["op"]
+    step = float(spec.get("step", 0) or 0)
+    if step <= 0:
+        return current
+    best = max(values) if op == ">=" else min(values)
+    sign = 1 if op == ">=" else -1
+    new = best + sign * (step if spec.get("step_kind", "pct") == "abs" else abs(best) * step)
+    if spec.get("cap") is not None:
+        new = min(new, float(spec["cap"])) if op == ">=" else max(new, float(spec["cap"]))
+    return _stricter(round(new, 3), current, op)        # never looser: a risk KPI (RISK_KPIS) only tightens or holds
+
+
+def ratchet_update(prev: dict | None, measurables: list[dict], today: dt.date, cfg_kpi: dict) -> dict:
+    """Process every complete ISO week after the last processed one (at most STATE_HISTORY_WEEKS; a new state starts with
+    the last `weeks` weeks). Deterministic for a given repo content and date."""
+    need = int((cfg_kpi.get("ratchet") or {}).get("weeks", 4))
+    prev = prev if isinstance(prev, dict) and prev.get("schema") == STATE_SCHEMA else {}
+    end = last_week_end(today)
+    start = (dt.date.fromisoformat(prev["last_week_end"]) + dt.timedelta(days=7)) if prev.get("last_week_end") \
+        else end - dt.timedelta(days=7 * (need - 1))
+    start = max(start, end - dt.timedelta(days=7 * (STATE_HISTORY_WEEKS - 1)))
+    weeks = []
+    while start <= end:
+        weeks.append(start)
+        start += dt.timedelta(days=7)
+    kpis_out, outcomes = {}, {}
+    for m in measurables:
+        spec, key = m["spec"], f"{m['id']}@{m['scope']}"
+        st = (prev.get("kpis") or {}).get(key) or {}
+        floor = float(spec["target"])
+        cur = _stricter(float(st.get("current_target", floor)), floor, spec["op"])
+        met, streak, hist = int(st.get("weeks_met", 0)), list(st.get("streak", [])), list(st.get("history", []))
+        for wk in weeks:
+            v, n = m["fn"](wk, m["window"])
+            rec = {"week": iso_week(wk), "value": v, "target": cur}
+            if v is None or (spec.get("min_n") and n < spec["min_n"]):
+                rec["outcome"] = "n/a"
+                met, streak = 0, []                      # an unmeasured week breaks the run
+            elif _meets(v, cur, spec["op"]):
+                rec["outcome"] = "met"
+                met, streak = met + 1, (streak + [v])[-need:]
+                if met >= need:
+                    new = raised_target(m["id"], spec, cur, streak)
+                    if new != cur:
+                        rec["raised_to"] = new
+                        cur, met, streak = new, 0, []
+            else:
+                rec["outcome"] = "missed"
+                met, streak = 0, []
+            hist.append(rec)
+            outcomes.setdefault(m["dept"], {}).setdefault(rec["week"], []).append(rec["outcome"])
+        kpis_out[key] = {"id": m["id"], "scope": m["scope"], "op": spec["op"], "floor": floor, "current_target": cur,
+                         "weeks_met": met, "streak": streak, "history": hist[-STATE_HISTORY_WEEKS:],
+                         "risk": m["id"] in RISK_KPIS}
+    depts = {}
+    for dept in sorted({m["dept"] for m in measurables} | set(prev.get("departments") or {})):
+        st = (prev.get("departments") or {}).get(dept) or {}
+        failed, hist = int(st.get("weeks_failed", 0)), list(st.get("history", []))
+        for wk in weeks:
+            res = outcomes.get(dept, {}).get(iso_week(wk), [])
+            out = "missed" if "missed" in res else ("met" if "met" in res else "n/a")
+            failed = failed + 1 if out == "missed" else (0 if out == "met" else failed)
+            hist.append({"week": iso_week(wk), "outcome": out})
+        depts[dept] = {"weeks_failed": failed, "history": hist[-STATE_HISTORY_WEEKS:]}
+    last = weeks[-1] if weeks else dt.date.fromisoformat(prev["last_week_end"])
+    return {"schema": STATE_SCHEMA, "v": 1, "last_week": iso_week(last), "last_week_end": last.isoformat(),
+            "weeks_needed": need, "kpis": dict(sorted(kpis_out.items())), "departments": depts}
+
+
+def weekly_review(state: dict, roles: dict) -> list[dict]:
+    order = [d for d in dict.fromkeys([d for _, d, _, _, _ in KPI_DEFS] + ["Company"])]
+    rows = []
+    for dept in order:
+        st = (state.get("departments") or {}).get(dept)
+        failed = int((st or {}).get("weeks_failed", 0))
+        last = ((st or {}).get("history") or [{}])[-1] if st else {}
+        rows.append({"dept": dept, "role": roles.get(dept, "-"), "weeks_failed": failed if st else None,
+                     "last_week": last.get("week"), "last_outcome": last.get("outcome", "n/a" if st else "not measured"),
+                     "flag": IMPROVE_FLAG if failed >= IMPROVE_AFTER_WEEKS else ""})
+    return rows
+
+
+def department_kpis(root: Path, now: dt.datetime, cfg: dict) -> tuple[dict, dict]:
+    """(KPI block, new ratchet state). The state is read through the vault; write() persists it."""
+    cfg_kpi = cfg.get("agents_kpi") or {}
+    specs, roles = cfg_kpi.get("kpis") or {}, cfg_kpi.get("roles") or {}
     reps = agg_reports(root, now, KPI_LOOKBACK_DAYS)
     facts = RepoFacts(root, now, cfg, reps)
     today = now.date()
@@ -740,20 +860,32 @@ def department_kpis(root: Path, now: dt.datetime, cfg: dict) -> dict:
     def acct_fn(metric, a):
         return lambda e, w: acct_metric(metric, per_day[a], e, w)
 
-    rows = []
+    items = []                                          # (kid, dept, label, scope, fn, window, metric, skip)
     for kid, dept, label, scope, metric in KPI_DEFS:
-        scopes = accts if scope == "acct" else ["repo"]
-        for a in scopes:
+        for a in (accts if scope == "acct" else ["repo"]):
             if metric in ACCT_METRICS:
-                rows.append(kpi_entry(kid, dept, label, a, acct_fn(metric, a), today, specs, metric=metric))
+                items.append((kid, dept, label, a, acct_fn(metric, a), None, metric, None))
             elif metric in REPO_METRICS:
-                rows.append(kpi_entry(kid, dept, label, a, lambda e, w, m=metric: facts.metric(m, e, w), today, specs,
-                                      metric=metric))
+                items.append((kid, dept, label, a, lambda e, w, m=metric: facts.metric(m, e, w), None, metric, None))
             else:
-                rows.append(kpi_entry(kid, dept, label, a, None, today, specs, skip=metric))
-    company = {a: [kpi_entry(kid, "Company", label, a, acct_fn(metric, a), today, specs, window=win, metric=metric)
-                   for kid, label, metric, win in COMPANY_DEFS] for a in accts}
-    return {"departments": rows, "company": company}
+                items.append((kid, dept, label, a, None, None, "", metric))
+    company_items = {a: [(kid, "Company", label, a, acct_fn(metric, a), win, metric, None)
+                         for kid, label, metric, win in COMPANY_DEFS] for a in accts}
+    measurables = [{"id": kid, "dept": dept, "scope": a, "fn": fn, "spec": specs[kid],
+                    "window": int(win or specs[kid].get("window", 30))}
+                   for kid, dept, _, a, fn, win, _, skip in items + [x for v in company_items.values() for x in v]
+                   if skip is None and kid in specs]
+    state = ratchet_update(_load(root / STATE_PATH), measurables, today, cfg_kpi)
+
+    def entry(it):
+        kid, dept, label, a, fn, win, metric, skip = it
+        return kpi_entry(kid, dept, label, a, fn, today, specs, window=win, skip=skip, metric=metric,
+                         role=roles.get(dept, "-"), ratchet=state["kpis"].get(f"{kid}@{a}"))
+
+    block = {"departments": [entry(it) for it in items],
+             "company": {a: [entry(it) for it in v] for a, v in company_items.items()},
+             "review": weekly_review(state, roles), "ratchet_week": state["last_week"]}
+    return block, state
 
 
 # ---------------------------------------------------------------- assembly / output
@@ -773,10 +905,11 @@ def evaluate(root: Path, now: dt.datetime) -> dict:
         bad = sorted({r["sub"] for r in sub if r["status"] == st and st in ("WARN", "FAIL")})
         rows.append(_row(name, "-", st, (f"{st}: {', '.join(bad)}" if bad else "all checked sub-agents OK")))
         rows += sub
+    kpi, state = department_kpis(root, now, cfg)
     return {"schema": SCHEMA, "v": VERSION, "day": now.date().isoformat(), "as_of": iso_z(now),
             "market_open": market_open(now), "overall": worst(r["status"] for r in rows if r["sub"] == "-"),
             "rows": rows, "kpis": {a or "-": kpis(all_reps.get(a, []), now.date()) for a in accts},
-            "kpi": department_kpis(root, now, cfg)}
+            "kpi": kpi, "kpi_state": state}   # kpi_state goes to reports/agents/kpi_state.json, not to the day file
 
 
 def stable(res: dict) -> str:
@@ -818,6 +951,14 @@ def render(res: dict) -> str:
               "Profitable days: day blocks with net % > 0 (after costs) / days with trades. Goal (docs/agents.md section 5): "
               "more days with trades and more profitable days, losing days capped. Not a promise of daily profit.", ""]
     kpi = res.get("kpi") or {}
+    if kpi.get("review"):
+        lines += [f"## Weekly review (docs/agents.md 6.2, last complete ISO week {kpi.get('ratchet_week')})", "",
+                  "| department | chức vụ | weeks_failed | last week | flag |", "|---|---|---|---|---|"]
+        for r in kpi["review"]:
+            lines.append(f"| {r['dept']} | {r['role']} | {_fmt(r['weeks_failed'])} | {r['last_outcome']} | "
+                         f"{('**' + r['flag'] + '**') if r['flag'] else '-'} |")
+        lines += ["", f"weeks_failed = consecutive complete ISO weeks in which a measured KPI of the department missed its "
+                  f"target; {IMPROVE_AFTER_WEEKS} or more: {IMPROVE_FLAG} (write it to improve_log).", ""]
     for acct, entries in (kpi.get("company") or {}).items():
         lines += [f"## Company KPIs (cash flow), account `{acct}`", ""] + kpi_table(entries, with_dept=False)
     if kpi.get("departments"):
@@ -836,30 +977,48 @@ def _trend_txt(t: dict | None) -> str:
 
 
 def kpi_table(entries: list[dict], with_dept: bool) -> list[str]:
-    head = "| department | KPI | scope | value | target | status | 7d trend | 30d trend | note |" if with_dept else \
-        "| KPI | value | target | status | 7d trend | 30d trend | note |"
+    head = "| department | chức vụ | KPI | scope | value | target | status | 7d trend | 30d trend | note |" if with_dept else \
+        "| KPI | chức vụ | value | target | status | 7d trend | 30d trend | note |"
     out = [head, "|" + "---|" * (head.count("|") - 1)]
     for e in entries:
         target = f"{e['op']} {e['target']:g} (warn {e['warn']:g})" if "op" in e else "-"
+        if "floor" in e and e["floor"] != e["target"]:
+            target += f", floor {e['floor']:g}"
+        if "weeks_met" in e:
+            target += f", met {e['weeks_met']} wk"
         val = "-" if e.get("value") is None else f"{e['value']:g}"
         if e.get("window_d"):
             val += f" ({e['window_d']}d, n {e.get('n', 0)})"
         tr = e.get("trend") or {}
-        cells = [e["kpi"], val, target, e["status"], _trend_txt(tr.get("7d")), _trend_txt(tr.get("30d")), e["reason"]]
+        cells = [e["kpi"], e.get("role", "-"), val, target, e["status"], _trend_txt(tr.get("7d")), _trend_txt(tr.get("30d")),
+                 e["reason"]]
         if with_dept:
-            cells = [e["dept"], e["kpi"], e["scope"]] + cells[1:]
+            cells = [e["dept"], e.get("role", "-"), e["kpi"], e["scope"]] + cells[2:]
         out.append("| " + " | ".join(str(c).replace("|", "/") for c in cells) + " |")
     return out + [""]
+
+
+def write_state(root: Path, state: dict | None) -> bool:
+    """reports/agents/kpi_state.json through the vault, only when its content changed."""
+    if not state:
+        return False
+    path, text = root / STATE_PATH, dumps_pretty(state)
+    if vault.exists(path) and vault.read_text(path, root) == text:
+        return False
+    vault.write_text(path, text, root)
+    return True
 
 
 def write(root: Path, res: dict) -> bool:
     out = root / OUT_DIR
     js = out / f"{res['day']}.json"
+    day = {k: v for k, v in res.items() if k != "kpi_state"}
+    state_changed = write_state(root, res.get("kpi_state"))
     prev = _load(js)
-    if isinstance(prev, dict) and stable(prev) == stable(res) and vault.exists(out / f"{res['day']}.md"):
-        return False
-    vault.write_text(js, dumps_pretty(res), root)
-    vault.write_text(out / f"{res['day']}.md", render(res), root)
+    if isinstance(prev, dict) and stable(prev) == stable(day) and vault.exists(out / f"{res['day']}.md"):
+        return state_changed
+    vault.write_text(js, dumps_pretty(day), root)
+    vault.write_text(out / f"{res['day']}.md", render(day), root)
     return True
 
 
