@@ -1,0 +1,54 @@
+{
+  "events": [
+    {
+      "forecast": "54.5",
+      "impact": "Medium",
+      "previous": "56.0",
+      "t": 1795445100,
+      "title": "Flash Manufacturing PMI",
+      "utc": "2026-11-23T14:45:00Z"
+    },
+    {
+      "forecast": "55.6",
+      "impact": "Medium",
+      "previous": "57.9",
+      "t": 1795445100,
+      "title": "Flash Services PMI",
+      "utc": "2026-11-23T14:45:00Z"
+    },
+    {
+      "forecast": "92.4",
+      "impact": "Medium",
+      "previous": "91.7",
+      "t": 1795532400,
+      "title": "CB Consumer Confidence",
+      "utc": "2026-11-24T15:00:00Z"
+    },
+    {
+      "forecast": "0.3%",
+      "impact": "High",
+      "previous": "0.3%",
+      "t": 1795613400,
+      "title": "Core PCE Price Index m/m",
+      "utc": "2026-11-25T13:30:00Z"
+    },
+    {
+      "forecast": "2.3%",
+      "impact": "Medium",
+      "previous": "2.3%",
+      "t": 1795613400,
+      "title": "Prelim GDP Price Index q/q",
+      "utc": "2026-11-25T13:30:00Z"
+    },
+    {
+      "forecast": "3.5%",
+      "impact": "High",
+      "previous": "3.4%",
+      "t": 1795613400,
+      "title": "Prelim GDP q/q",
+      "utc": "2026-11-25T13:30:00Z"
+    }
+  ],
+  "fetched_day": "2026-11-27",
+  "src": "ff_calendar_thisweek"
+}
