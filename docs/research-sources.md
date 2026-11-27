@@ -37,3 +37,4 @@
 | 2026-11-27 | Tỷ lệ vàng/bạc (GlobalARB, tickfloor, quantarenas) | chiến lược | Walk-forward ngoài mẫu −0,27%/năm | loại |
 | 2026-11-27 | Connors RSI(2)/IBS D1 trên GLD (bulltides, duckquant, setup4alpha, quantifiedstrategies) | chiến lược | Thua mua-giữ ở cả hai nửa mẫu | loại |
 | 2026-11-27 | tesseratrades BB breakout NY H1 | chiến lược | Mục tiêu 5R, thắng 24%, không chuyển sang 1R được | không dùng |
+| 2026-11-27 | Hugging Face CarlosSilva1/xauusd-ticks (CC-BY-4.0, Silva 2026), tick bid/ask và khối lượng bid/ask, 05/2021–05/2026 | dữ liệu | Feed của broker khác: giá lệch khoảng −0,1, spread trung bình 0,44 (mô hình STD của ta 0,20), năm 2025–26 lên 0,6–0,8. Áp chi phí này thì v1.53 còn khoảng nửa lãi. Lọc theo chênh lệch khối lượng/tốc độ tick và họ order-flow M1: không đạt | v1.72 |
