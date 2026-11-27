@@ -142,6 +142,20 @@ Cả hệ thống được vận hành như một công ty. Giao dịch là ho�
 - **KPI rủi ro không nâng theo kiểu ép rủi ro.** Sụt vốn, ngày lỗ nặng nhất và vi phạm giới hạn cứng chỉ được giữ mức hoặc siết chặt hơn.
 - **Đánh giá:** mỗi tuần, CEO (Claude) chấm bảng KPI. Phòng ban nào không đạt 2 tuần liền phải có kế hoạch cải tiến, ghi vào `improve_log`. R&D ưu tiên phòng ban yếu nhất.
 
+### 6.3 Phòng Đổi mới (chống tư duy rập khuôn, yêu cầu E7)
+
+| Agent con | Vai trò | Khi nào chạy | KPI |
+|---|---|---|---|
+| **Người mới** (`.claude/agents/fresh-eyes.md`) | Đề xuất ý tưởng như người mới nhận dự án. Không đọc lịch sử nghiên cứu, chỉ nhận danh sách đã thử để tránh lặp | Đầu mỗi vòng nghiên cứu | Số ý tưởng mới được thử; % ý tưởng qua kiểm tra |
+| **Phản biện** (`.claude/agents/red-team.md`) | Tấn công phương pháp: xu hướng thị trường (drift), rò dữ liệu, lỗi nến, phí, cổng quá chặt, cách hiểu ràng buộc | Trước mỗi lần dựng EA và sau mỗi kết quả bất ngờ | Số lỗi tìm được trước khi lỗi lọt vào bản dựng |
+| **Trinh sát nguồn ngoài** (`.claude/agents/scout.md`) | Tìm dữ liệu, bài nghiên cứu, mã mở, ý tưởng cộng đồng. Bỏ qua mọi nguồn đã có trong `docs/research-sources.md` | Mỗi 2–4 vòng | Số nguồn mới; số giả thuyết đưa vào mô phỏng |
+
+Quy tắc:
+- Mỗi vòng nghiên cứu phải có ít nhất 1 ý tưởng từ Người mới hoặc Trinh sát.
+- Mọi bản dựng phải qua Phản biện.
+- Kết quả được đánh giá theo lợi thế **sau khi trừ xu hướng** (R vượt so với vào lệnh ngẫu nhiên cùng chiều, cùng giờ).
+- Phát hiện của phản biện v1.69: khoảng 68% lãi D7 của v1.53 đến từ xu hướng tăng của vàng.
+
 ## 7. Lộ trình
 
 | Bước | Nội dung | Trạng thái |
