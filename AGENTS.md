@@ -8,7 +8,8 @@ Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every
 
 ## Daily analysis routine (Claude)
 
-0. Read `docs/user-requirements.md` (binding user requirements + checklist) and check every item; report any item
+0. Read `docs/user-requirements.md` and, for any EA research/upgrade, follow `docs/research-protocol.md` step by step.
+   Read `docs/user-requirements.md` (binding user requirements + checklist) and check every item; report any item
    that is not ✅. Then analyse the market first (multi-timeframe trend, reversal patterns/signals, S/R, news) from
    the EA's `mkt` / `mkt.ctx` report block before any control decision.
 1. `data/quality.json`: is `ok` true? Any `stale` warnings?
