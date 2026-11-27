@@ -3,10 +3,10 @@
   "global": {
     "expires_unix": 1795906800,
     "expires_utc": "2026-11-28T23:00:00Z",
+    "open_risk_pct": 6.0,
     "pause_all": false,
     "reason_code": "R05",
-    "risk_mult": 0.5,
-    "open_risk_pct": 6
+    "risk_mult": 0.5
   },
   "methods": {
     "M701": {
@@ -21,8 +21,9 @@
     }
   },
   "news_blocks": [],
-  "notes_vi": "Khởi động v1.30 thận trọng: rủi ro x0.5, trần rủi ro mở 6% (EA đặt 12%); nới dần khi kết quả thật tốt.",
+  "notes_vi": "Kh\u1edfi \u0111\u1ed9ng b\u1ea3n EA m\u1edbi th\u1eadn tr\u1ecdng: gi\u1ea3m r\u1ee7i ro v\u00e0 h\u1ea1 tr\u1ea7n r\u1ee7i ro m\u1edf; n\u1edbi d\u1ea7n khi k\u1ebft qu\u1ea3 th\u1eadt t\u1ed1t.",
   "seq": 3,
+  "updated_unix": 1795745272,
   "updated_utc": "2026-11-27T02:07:52Z",
   "v": 1
 }
