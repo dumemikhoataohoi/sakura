@@ -3,7 +3,7 @@
 Repository **sakura** is the GitHub data bot of the Zumi XAU EA (MT5, XAUUSDm on Exness). It prepares macro/calendar
 context for the EA, stores the EA's trade/analysis reports, renders journal analytics and raises alerts on a long-lived PR.
 
-Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every file and field),
+Read first: `docs/agents.md` (multi-agent roles), `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every file and field),
 `docs/workflows.md` (triggers, permissions, alerts PR), `docs/mql5-bridge.md` (EA side).
 
 ## Daily analysis routine (Claude)
@@ -23,6 +23,12 @@ Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every
 5. The open PR labelled `zumi-alerts`: alerts posted since the last review.
 6. Coordination (control channel, `docs/control.md`):
    1. `python scripts/coordinator_report.py` -> read `reports/coord/<today>.md` (rule hits + proposed control.json).
+      v2 rules: R01 streak, R02 Wilson health switch per `M### x phase` (90-day history of the stored daily blocks),
+      R08 restore (cell or blocked-signal lower bound >= 50 %), optional R02 `reduce` risk allocation (`alloc_enable`),
+      R05 drawdown ladder (3 % / 5 % -> x0.75 / x0.5 and open-risk cap 9 / 6 %), R09 side `auto` (needs `by_side`),
+      R03 news. Replayed walk-forward with `scripts/coord_replay.py` (research streams stay outside the repo): on the
+      EA streams the per-cell rules almost never have enough trades, so expect a win% lift of ~0 points; treat the
+      coordinator as a risk tool (news, streak, drawdown ladder), not as a win-rate lever.
    2. Check `python scripts/control.py effective` (what the EA applies now) and `control/CHANGELOG.md`.
    3. Decide. Apply with `python scripts/coordinator_report.py --apply`, or edit `control/control.json` (bump `seq`,
       codes `M###` only, reason codes from `control/reason_codes.md`, no prices in `notes_vi`) and run

@@ -84,6 +84,7 @@ Cập nhật lần cuối: 2026-11-27.
 | E1 | Demo 2 tuần (v1.30 tuần 1, bản nâng cấp 5/12 tuần 2). Đánh giá **12/12** | 🟡 Đang chạy |
 | E2 | Điều kiện: ngày nào cũng có lệnh; lãi > 0, hệ số lợi nhuận ≥ 1,2; sụt giảm ≤ 10%, không tuần nào lỗ quá 5%; ~≥ 200 lệnh; báo trung thực tỉ lệ thắng so với 70% | 🟡 |
 | E3 | Đạt thì vào tiền thật bằng tài khoản nhỏ, rủi ro 0,25–0,5% mỗi lệnh | ❌ Chờ 12/12 |
+| E4 | **Cực quan trọng (2026-11-27): hệ đa agent.** EA là một AI agent, GitHub là một AI agent, Claude là một AI agent; mỗi agent có nhiều agent con, điều phối lẫn nhau với mục tiêu chung: **mỗi ngày đều có lệnh và có lãi**. Thiết kế: `docs/agents.md` | 🟡 thiết kế xong; đang làm agent điều phối v2 / C2 |
 
 ## F. Cách làm việc
 
