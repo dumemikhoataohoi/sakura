@@ -90,7 +90,7 @@ replay `scripts/coord_replay.py`. Pre-registered thresholds (`config/settings.js
 | R07 enable | codes listed in `enable_codes` (user pre-approved), when the EA's current phase is listed | `on` (needs `InpGhAllowEnable`) |
 | R05 drawdown ladder | week or MTD drawdown >= 3 % / 5 % (`dd_ladder`; `null` = v1 single step `dd_reduce_pct` 5 -> `dd_reduce_mult` 0.5) | global x0.75 / x0.5 and `open_risk_pct` 9 / 6 (`dd_open_risk_ladder`, never above `open_risk_local_pct` 12; the EA applies `min(local, file)`). `pause_all` only at the top step **and** when the EA itself reports a crisis block (`mkt.ctx.cr` = `BLOCK...`, `dd_crisis_pause_all`) |
 | R04 volatility | VIX high flag and `vix_high_mult` < 1 (off by default) | global x`vix_high_mult` |
-| R09 side | one side's Wilson upper bound < `side_ub_pct` 45 % over n >= `side_min_n` 30 in the last `side_window_days` 14 (needs the optional `by_side` aggregate; EA161 <= v1.41 does not send it, so R09 stays inert) | `global.side` `auto` (the EA's own multi-TF CDS picks the side), otherwise `both` |
+| R09 side | one side's Wilson upper bound < `side_ub_pct` 45 % over n >= `side_min_n` 30 in the last `side_window_days` 14 (needs the `by_side` aggregate of bridge 2.7; an EA compiled with bridge <= 2.6 does not send it, so R09 stays inert) | `global.side` `auto` (the EA's own multi-TF CDS picks the side), otherwise `both` |
 | R03 news | NFP/CPI/FOMC within `news_lookahead_h` 72 h | block from `news_before_min` 30 before to `news_after_min` 30 after |
 
 Directives that no longer fire are kept until they expire, then dropped (the method returns to its EA default).

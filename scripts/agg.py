@@ -24,6 +24,10 @@ PHASE_RE = re.compile(r"[^A-Za-z0-9_-]")
 FLAG_KEY_RE = re.compile(r"[^a-z0-9_:.-]")
 RULES = ("no_sl", "risk_cap", "news", "daily_cap")
 AGG_SIDES = ("buy", "sell")   # by_side keys (coordinator R09); any other key is dropped
+# bridge 2.7: session of the entry (UTC hour bands, = ZGB_SESS_*_H in mql5/ZumiGitHubBridge.mqh); by_session keys
+# Each band starts on a BUCKETS boundary, so by_session is a coarsening of the mtd grid and reveals no extra entry time.
+SESSION_BANDS_UTC = ((0, "ASIA"), (8, "LON"), (12, "NY"), (20, "OFF"))   # (first UTC hour, label), ascending
+AGG_SESSIONS = tuple(label for _, label in SESSION_BANDS_UTC)
 
 AGG_INT = ("n", "wins", "losses", "be", "max_ls", "cur_ls", "lead_ls")
 AGG_FLOAT = ("win_pct", "net_r", "avg_r", "gross_win_r", "gross_loss_r", "pf", "net_pct", "dd_pct",
@@ -64,10 +68,21 @@ SHADOW_PERIODS = ("day", "week", "mtd", "r30")
 _SHADOW_RS = "|".join(SHADOW_REASONS)
 SHADOW_METHOD_RE = re.compile(rf"^M\d{{3}}:(?:{_SHADOW_RS})$")
 SHADOW_PHASE_RE = re.compile(rf"^(?:[A-Z]{{2,8}}|none):(?:{_SHADOW_RS})$")
+SHADOW_SESSION_RE = re.compile(rf"^(?:{'|'.join(AGG_SESSIONS)}):(?:{_SHADOW_RS})$")   # bridge 2.7: "SESS:REASON"
 SHADOW_METHOD_MAX = 30                                            # the EA sends the top 30 method code x reason cells
 SHADOW_PHASE_MAX = 40
+SHADOW_SESSION_MAX = len(AGG_SESSIONS) * len(SHADOW_REASONS)
 SHADOW_N_MAX = 1_000_000
 SHADOW_R_PER_TRADE = 2.5                                          # |R| of one virtual trade: SL -1, TP <= 2R (EA135 mode 2)
+
+
+def session_of(hour_utc: int) -> str:
+    """Session label of a UTC hour (0..23), the same bands as the bridge's ZGB_SessionOf."""
+    label = SESSION_BANDS_UTC[0][1]
+    for first, name in SESSION_BANDS_UTC:
+        if hour_utc >= first:
+            label = name
+    return label
 
 
 def _shadow_row(v, path: str, stripped: set, full: bool) -> dict | None:
@@ -149,6 +164,8 @@ def sanitize_shadow(obj, stripped: set, path: str = "data.shadow") -> dict | Non
             val = _shadow_cells(v, f"{path}.by_method", stripped, SHADOW_METHOD_RE, SHADOW_METHOD_MAX)
         elif k == "by_phase":
             val = _shadow_cells(v, f"{path}.by_phase", stripped, SHADOW_PHASE_RE, SHADOW_PHASE_MAX)
+        elif k == "by_session":
+            val = _shadow_cells(v, f"{path}.by_session", stripped, SHADOW_SESSION_RE, SHADOW_SESSION_MAX)
         if val is None:
             _note(stripped, path, k)
         else:
@@ -405,14 +422,15 @@ def sanitize_agg_block(obj, path: str, stripped: set) -> dict | None:
             val = _groups(v, f"{path}.by_phase", stripped, _phase_key)
         elif k == "by_method_phase":
             val = _groups(v, f"{path}.by_method_phase", stripped, _method_phase_key)
-        elif k == "by_side":
-            sides = {}
+        elif k in ("by_side", "by_session"):
+            allowed, norm = (AGG_SIDES, str.lower) if k == "by_side" else (AGG_SESSIONS, str.upper)
+            keep = {}
             for sk, sv in (v.items() if isinstance(v, dict) else []):
-                if str(sk).lower() in AGG_SIDES:
-                    sides[str(sk).lower()] = sv
+                if norm(str(sk)) in allowed:
+                    keep[norm(str(sk))] = sv
                 else:
-                    stripped.add(f"{path}.by_side.<invalid>")   # never log the raw key
-            val = _groups(sides, f"{path}.by_side", stripped, lambda x: x)
+                    stripped.add(f"{path}.{k}.<invalid>")   # never log the raw key
+            val = _groups(keep, f"{path}.{k}", stripped, lambda x: x)
         elif k == "grid":
             val = _grid(v, f"{path}.grid", stripped)
         else:
@@ -503,7 +521,7 @@ def sanitize_v2(payload: dict, rcfg: dict, now: dt.datetime, acct: str) -> tuple
 def empty_agg() -> dict:
     return {"n": 0, "wins": 0, "losses": 0, "be": 0, "net_r": 0.0, "gross_win_r": 0.0, "gross_loss_r": 0.0,
             "net_pct": 0.0, "max_ls": 0, "cur_ls": 0, "lead_ls": 0, "dd_pct": 0.0,
-            "rule": {}, "by_method": {}, "by_phase": {}, "by_side": {}, "grid": {}}
+            "rule": {}, "by_method": {}, "by_phase": {}, "by_side": {}, "by_session": {}, "grid": {}}
 
 
 def finish(a: dict) -> dict:
@@ -546,7 +564,7 @@ def merge_aggs(aggs: list[dict]) -> dict:
         path_dd = max(path_dd, peak - cum)
         for r, c in (a.get("rule") or {}).items():
             out["rule"][r] = out["rule"].get(r, 0) + c
-        for fld in ("by_method", "by_phase", "by_side"):
+        for fld in ("by_method", "by_phase", "by_side", "by_session"):
             for k, g in (a.get(fld) or {}).items():
                 out[fld][k] = _merge_group(out[fld][k], g) if k in out[fld] else dict(g)
         for wd, row in (a.get("grid") or {}).items():

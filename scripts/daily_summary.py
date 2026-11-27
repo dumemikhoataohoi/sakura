@@ -246,6 +246,9 @@ def agg_section(acct: str, label: str, a: dict, rep: dict | None, flags: list[di
             out += [f"EA phase at the last report: `{md_escape(rep['data']['phase'])}`", ""]
     out += agg_group_table("By method code", a.get("by_method") or {})
     out += agg_group_table("By phase", a.get("by_phase") or {})
+    out += agg_group_table("By side", a.get("by_side") or {})                        # bridge 2.7
+    out += agg_group_table("By session (UTC entry: ASIA 00-08, LON 08-12, NY 12-20, OFF 20-24)",
+                           a.get("by_session") or {})                                # bridge 2.7
     out += agg_grid_table(a.get("grid") or {})
     if flags:
         out += ["#### EA flags", ""] + [f"- `{fl['key']}` {md_escape(fl.get('msg', ''))}" for fl in flags] + [""]
@@ -388,7 +391,8 @@ def shadow_section(rep: dict, pkey: str, real: dict) -> list[str]:
                f"{f(real_avg, 3, True)} | - |")
     out += ["", f"Virtual trades still open: {sh.get('open', 0)}.", ""]
     for title, key in (("By method code x reason (rolling 30 days, top 10 by n)", "by_method"),
-                       ("By phase x reason (rolling 30 days, top 10 by n)", "by_phase")):
+                       ("By phase x reason (rolling 30 days, top 10 by n)", "by_phase"),
+                       ("By session x reason (rolling 30 days, top 10 by n)", "by_session")):
         cells = sh.get(key) or {}
         if not cells:
             continue

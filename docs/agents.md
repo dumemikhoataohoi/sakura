@@ -29,7 +29,7 @@ Tài liệu này mô tả vai trò của từng agent, hợp đồng dữ liệu
 | **Risk** | Thang rủi ro theo chuỗi thua, ngân sách rủi ro cùng chiều, dừng lỗ ngày có tính cả lệnh đang mở (W1b), lớp khủng hoảng, bộ dừng sụt 15%, trần 1%/lệnh | v1.37 rev2 (+ W1b ở v1.40) |
 | **Execution** | Gửi lệnh, xử lý phản hồi của sàn, chống lệnh trùng khi khởi động lại, kiểm tra spread, trượt giá, lot tối thiểu, ký quỹ | v1.35+ |
 | **Shadow / Learning** | Ghi lệnh ảo cho mọi tín hiệu bị chặn, kèm lý do: CELL, CTRL, NEWS, CRISIS, CAP, SPREAD, BREAKER, SIDE, OTHER | cầu nối 2.5+ |
-| **Reporter** | Gửi báo cáo gộp v2, heartbeat mỗi giờ và thống kê lệnh ảo lên GitHub | cầu nối 2.6 |
+| **Reporter** | Gửi báo cáo gộp v2, heartbeat mỗi giờ và thống kê lệnh ảo lên GitHub; từ cầu nối 2.7 thêm `by_side` (mua / bán, cho luật R09) và `by_session` (ASIA / LON / NY / OFF) | cầu nối 2.7 |
 | **Control client** | Đọc `control.json` và kiểm tra hợp lệ. Áp dụng ở mức min(giá trị cục bộ, giá trị điều phối). Hết hạn hoặc lỗi thì về NEUTRAL | cầu nối 2.6 |
 
 ### 2.2 GitHub agent
@@ -43,6 +43,7 @@ Tài liệu này mô tả vai trò của từng agent, hợp đồng dữ liệu
 | **Coordinator** | Áp luật điều phối lên thống kê và đề xuất `control.json` | `coordinator_report.py` (v2 đang làm), `coord_replay.py` |
 | **Guard** | Chuẩn hóa `control.json`, kiểm tra hợp lệ, ghi nhật ký thay đổi | `control.py`, `control.yml` |
 | **Alerts** | Đăng cảnh báo lên PR `zumi-alerts` | `alerts.yml`, `alerts.py` |
+| **Monitor** | Tự giám sát: mỗi agent và agent con một dòng OK / WARN / FAIL kèm lý do, cùng KPI ngày (số lệnh hôm nay, số ngày có lệnh và có lãi trong 7 / 30 ngày, chuỗi thua, sụt giảm tuần / tháng) | `agents_status.py` → `reports/agents/` (trong `data.yml`) |
 
 ### 2.3 Claude agent
 

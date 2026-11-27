@@ -25,7 +25,7 @@ Rules (v2; per method code M### and EA phase label):
               pause_all only at the top step AND when the EA itself reports a crisis block (mkt.ctx.cr)
   R04 global  VIX high flag and vix_high_mult < 1 -> risk_mult = vix_high_mult (off by default)
   R09 global  side: "auto" when one side's Wilson upper bound < side_ub_pct over n >= side_min_n in the
-              last side_window_days (needs the EA's by_side aggregate), otherwise "both"
+              last side_window_days (needs the by_side aggregate of bridge 2.7), otherwise "both"
   R03 block   NFP/CPI/FOMC within news_lookahead_h -> block [t - before, t + after]
 Directives that are no longer triggered are kept until they expire, then dropped ("restored").
 Precedence per code: pause > boost > on > reduce (a kept pause is never lifted by a reduce).

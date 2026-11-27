@@ -32,6 +32,12 @@
 //|  side is both or auto (auto = the EA's own confluence score      |
 //|  decides: ZGB_SideMode() == ZGB_SIDE_AUTO), or when it matches.   |
 //|  Never opens, closes or modifies a position.                     |
+//|  2.7: aggregate blocks gain by_side ("buy" / "sell": coordinator |
+//|  rule R09) and by_session (ASIA / LON / NY / OFF by the UTC hour |
+//|  of the entry, bands ZGB_SESS_*_H). ZGB_SessionOf(t_utc) labels  |
+//|  any time the same way (EA shadow cells "SESS:REASON"). Extra    |
+//|  dimension only: ZGB_PhaseKey and the control codes are         |
+//|  unchanged. Reporting only, no new inputs.                       |
 //|  2.5 FIX: ZGB_CodeForComment(cmt) is the one comment -> M### path|
 //|  for reports (entry deal comment) AND control (the EA passes the |
 //|  order comment); control phases are keyed like the server       |
@@ -81,7 +87,7 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.6"
+#define ZGB_VERSION "2.7"
 #define ZGB_HAS_MKTCTX                 // 2.4: ZGB_SetMarketCtx available (EA161 v1.31 tests this)
 #define ZGB_CTX_MAX 1800               // 2.4: max bytes of the mkt.ctx object
 #define ZGB_HAS_SHADOW                 // 2.5: ZGB_SetShadowStats available (EA161 v1.32 tests this)
@@ -91,6 +97,12 @@
 #define ZGB_SIDE_BUY   1
 #define ZGB_SIDE_SELL  (-1)
 #define ZGB_SIDE_AUTO  2
+#define ZGB_HAS_BYSIDE                 // 2.7: aggregate blocks carry by_side {"buy","sell"} (sakura agg.AGG_SIDES, coordinator R09)
+#define ZGB_HAS_SESSION                // 2.7: by_session aggregate + ZGB_SessionOf(t_utc) (sakura agg.SESSION_BANDS_UTC)
+#define ZGB_SESS_ASIA_H 0              // 2.7: session = band of the UTC hour: ASIA [0,8), LON [8,12), NY [12,20), OFF [20,24);
+#define ZGB_SESS_LON_H  8              //      every band starts on a 4-hour grid bucket, so by_session never reveals more than the
+#define ZGB_SESS_NY_H   12             //      month-to-date grid already does (no single-hour intersection)
+#define ZGB_SESS_OFF_H  20
 #define ZGB_CTL_CACHE   "zumi_gh_control.json"
 #define ZGB_CTL_STALE_S (72 * 3600)
 #define ZGB_CTL_MAX_TTL (7 * 86400)
@@ -210,6 +222,8 @@ struct ZgbPos                       // one CLOSED position, used only inside the
    double            pl;            // net result, % of balance
    string            mcode;         // method code M000..M999
    string            phase;
+   int               side;          // 2.7: 1 = buy, -1 = sell (direction of the entry deal)
+   string            sess;          // 2.7: ASIA / LON / NY / OFF of the entry time (UTC)
    bool              no_sl, risk_over, news;
    double            mae, mfe;
    bool              has_ex;
@@ -697,6 +711,22 @@ string ZGB_PhaseKey(const string phase)
      }
    return(StringLen(o) > 0 ? o : "none");
   }
+
+// 2.7: trading session of a UTC time from the hour bands ZGB_SESS_*_H (= sakura scripts/agg.py SESSION_BANDS_UTC). A union of
+// the month-to-date grid's 4-hour buckets. An additional report dimension: it never enters ZGB_PhaseKey or a control code.
+string ZGB_SessionOf(const datetime t_utc)
+  {
+   MqlDateTime d;
+   TimeToStruct(t_utc, d);
+   if(d.hour >= ZGB_SESS_OFF_H) return("OFF");
+   if(d.hour >= ZGB_SESS_NY_H)  return("NY");
+   if(d.hour >= ZGB_SESS_LON_H) return("LON");
+   return("ASIA");
+  }
+
+string ZGB_SessionNow(void) { return(ZGB_SessionOf(TimeGMT())); }   // 2.7: e.g. for the EA's shadow cells "SESS:REASON"
+
+string ZGB_SideKey(const int side) { return(side > 0 ? "buy" : "sell"); }   // 2.7: by_side key (sakura agg.AGG_SIDES)
 
 //--- NFP/CPI/FOMC times seen in latest.json are remembered locally for the news rule
 void ZGB_EventsLoad(void)
@@ -1901,6 +1931,8 @@ int ZGB_LoadPositions(const datetime from, ZgbPos &ps[])
       ps[n].has_r = (risk > 0);
       ps[n].pl = pl;
       ps[n].mcode = ZGB_CodeForComment(cmt);   // entry deal comment (2.5: same path as the control channel)
+      ps[n].side = buy ? 1 : -1;                                    // 2.7: by_side
+      ps[n].sess = ZGB_SessionOf((datetime)ZGB_ToUtc(t_in));        // 2.7: by_session (entry time, UTC)
       ps[n].no_sl = (sl <= 0);
       double loss = 0;
       ps[n].risk_over = (sl > 0 && last_base > 0 &&
@@ -2002,6 +2034,9 @@ string ZGB_AggJson(ZgbPos &ps[], const datetime from, const bool with_grid)
    string mk[], pk[], dk[], xk[], mo[], po[], xo[];
    int mn[], mw[], pn[], pw[], xn[], xw[];
    double mr[], pr[], dv[], xr[];
+   string sdk[], sdo[], ssk[], sso[];   // 2.7: by_side / by_session groups
+   int sdn[], sdw[], ssn[], ssw[];
+   double sdr[], ssr[];
    int gn[42], gw2[42];
    ArrayInitialize(gn, 0);
    ArrayInitialize(gw2, 0);
@@ -2025,6 +2060,8 @@ string ZGB_AggJson(ZgbPos &ps[], const datetime from, const bool with_grid)
       ZGB_GroupAdd(mk, mn, mw, mr, mo, ps[i].mcode, oc, rr);
       ZGB_GroupAdd(pk, pn, pw, pr, po, ps[i].phase, oc, rr);
       ZGB_GroupAdd(xk, xn, xw, xr, xo, ps[i].mcode + ":" + ps[i].phase, oc, rr);
+      ZGB_GroupAdd(sdk, sdn, sdw, sdr, sdo, ZGB_SideKey(ps[i].side), oc, rr);   // 2.7
+      ZGB_GroupAdd(ssk, ssn, ssw, ssr, sso, ps[i].sess, oc, rr);                // 2.7
       // daily cap: closed P/L per server day
       string day = ZGB_Date(ps[i].t_out);
       int di = 0, nd = ArraySize(dk);
@@ -2059,19 +2096,21 @@ string ZGB_AggJson(ZgbPos &ps[], const datetime from, const bool with_grid)
       grid = ",\"grid\":{" + grid + "}";
      }
    int n = m;
+   string ext = ",\"by_side\":" + ZGB_GroupJson(sdk, sdn, sdw, sdr, sdo) +
+                ",\"by_session\":" + ZGB_GroupJson(ssk, ssn, ssw, ssr, sso);   // 2.7
    string out = StringFormat(
       "{\"from\":\"%s\",\"to\":\"%s\",\"n\":%d,\"wins\":%d,\"losses\":%d,\"be\":%d,\"win_pct\":%s,\"net_r\":%s,"
       "\"avg_r\":%s,\"gross_win_r\":%s,\"gross_loss_r\":%s,\"pf\":%s,\"net_pct\":%s,\"max_ls\":%d,\"cur_ls\":%d,"
       "\"lead_ls\":%d,\"dd_pct\":%s,\"n_r\":%d,\"n_ex\":%d,\"mae_r\":%s,\"mfe_r\":%s,"
       "\"rule\":{\"no_sl\":%d,\"risk_cap\":%d,\"news\":%d,\"daily_cap\":%d},\"by_method\":%s,\"by_phase\":%s,"
-      "\"by_method_phase\":%s%s}",
+      "\"by_method_phase\":%s%s%s}",
       ZGB_IsoDate(from), ZGB_IsoDate(TimeTradeServer()), n, wins, losses, be,
       ZGB_Num(wins + losses > 0 ? 100.0 * wins / (wins + losses) : EMPTY_VALUE, 1), ZGB_Num(net_r, 3),
       ZGB_Num(n > 0 ? net_r / n : EMPTY_VALUE, 3), ZGB_Num(gw, 3), ZGB_Num(gl, 3),
       ZGB_Num(gl > 0 ? gw / gl : EMPTY_VALUE, 2), ZGB_Num(net_pct, 3), max_ls, cur_ls, lead_ls, ZGB_Num(dd, 3),
       n_r, n_ex, ZGB_Num(n_ex > 0 ? mae / n_ex : EMPTY_VALUE, 3), ZGB_Num(n_ex > 0 ? mfe / n_ex : EMPTY_VALUE, 3),
       no_sl, risk_cap, news, daily_cap, ZGB_GroupJson(mk, mn, mw, mr, mo), ZGB_GroupJson(pk, pn, pw, pr, po),
-      ZGB_GroupJson(xk, xn, xw, xr, xo), grid);
+      ZGB_GroupJson(xk, xn, xw, xr, xo), ext, grid);
    return(out);
   }
 

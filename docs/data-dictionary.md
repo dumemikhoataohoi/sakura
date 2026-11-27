@@ -163,6 +163,7 @@ real trades. Counts and R only: **no prices, no times, no method names**. Size <
 | `periods.day` / `.week` / `.mtd` / `.r30` | `{REASON: {n, wins, losses, to, net_r}}` (same windows as the aggregate blocks; `to` = time-outs; win = R > 0, loss = R < 0) |
 | `by_method` | rolling 30 days, top 30 cells by `n`: `{"M###:REASON": {n, wins, net_r}}` (method code from the entry comment, the same code as real trades' `by_method`) |
 | `by_phase` | rolling 30 days, top 40: `{"PHASE:REASON": {n, wins, net_r}}`, PHASE as `mkt.ctx.phase` (`[A-Z]{2,8}`) or `none` |
+| `by_session` | optional (bridge 2.7 label, sent by an EA that uses `ZGB_SessionOf`): rolling 30 days, at most 36 cells `{"SESS:REASON": {n, wins, net_r}}`, SESS `ASIA` / `LON` / `NY` / `OFF` of the blocked signal's time (UTC) |
 
 Reasons (first block wins, in the EA's order): `CAP` base-slot pre-check (MaxOpen, same entry, NO-STACK); then at the order
 entry `CELL` (phase cell mask off, S4 direction / pullback), `NEWS` (news-day veto, crisis NewsFlat window), `CAP` (max per
@@ -171,7 +172,7 @@ breaker), `CTRL` (control channel: pause, disabled, `risk_mult` 0, extra news bl
 spread limit, EA136 spread-to-risk), `CRISIS` (volatility, gap, day/week stop, max same side), `OTHER` (weekend cut, EA134 /
 EA136 / EA135, broker). A NEWS / CAP signal whose phase cell is off counts as `CELL`; signals of methods that are not in the
 active selection are not recorded. Engine-local pre-checks inside modules, lanes and M1 engines are not counted.
-Validator (`agg.sanitize_shadow`): reason vocabulary, `M\d{3}` and phase regexes, `wins + losses <= n`, `|net_r| <= 2.5 x n`,
+Validator (`agg.sanitize_shadow`): reason vocabulary, `M\d{3}`, phase and session regexes, `wins + losses <= n`, `|net_r| <= 2.5 x n`,
 list caps; anything else is dropped (key names only are logged, cell keys as `<invalid>`). The daily / weekly / monthly pages
 render "Blocked signals (shadow)" for `day` / `week` / `mtd`: per reason blocked n, shadow win% and R next to the real trades
 of the same period. Tests: `tests/test_shadow.py`.
@@ -192,7 +193,8 @@ Aggregate block (positions that are fully closed, counted at their last exit):
 | `by_method` | `{"M001": {n, wins, win_pct, net_r, cur_ls, l20_n, l20_wins}, ...}`: **method codes**, never names (see below); `cur_ls` = current losing streak of the group, `l20_*` = its last 20 trades |
 | `by_phase` | same per phase name |
 | `by_method_phase` | same per `"M###:PHASE"` (used by the coordinator rules) |
-| `by_side` | optional, keys `buy` / `sell` only (`{n, wins, net_r}`): coordinator rule R09. Any other key is dropped. EA161 <= v1.41 / bridge 2.6 do not send it yet (R09 then never fires) |
+| `by_side` | bridge 2.7: keys `buy` / `sell` only (direction of the entry deal), same fields as `by_method` groups: coordinator rule R09 (summed over the stored `day` blocks of the last `side_window_days`). Any other key is dropped (logged as `<invalid>`). EAs compiled with bridge <= 2.6 do not send it (R09 then never fires) |
+| `by_session` | bridge 2.7: keys `ASIA` / `LON` / `NY` / `OFF` only, same fields as `by_method` groups: session of the entry time by UTC hour band, ASIA 00-08, LON 08-12, NY 12-20, OFF 20-24 (`ZGB_SESS_*_H` in the bridge = `agg.SESSION_BANDS_UTC`). Every band is a union of `grid` buckets, so it reveals no entry time the month-to-date grid does not. An extra dimension: phase keys and control codes are unchanged; other keys are dropped |
 | `grid` | `mtd` only: `{"Mon": {"08": {n, wins}}}` weekday x 4-hour UTC bucket of the entry; cells with `n < 3` carry the count only |
 | `n_ex`, `mae_r`, `mfe_r` | optional average worst / best excursion in R (positions tracked while open) |
 
@@ -226,6 +228,12 @@ Split into parts when larger than `InpGhMaxPayloadBytes`.
   are merged.
 * `reports/monthly/YYYY-MM.md`: the `mtd` block of the last report in the month (if the EA was offline on the last
   trading days, the page stops at the last report).
+* `reports/agents/YYYY-MM-DD.md` / `.json` (schema `zumi.agents_status` v1, `scripts/agents_status.py`, hourly in
+  `data.yml`): one health row per agent and sub-agent of `docs/agents.md` (`agent`, `sub`, `status` OK / WARN / FAIL /
+  SKIP = not checkable offline, `reason`, `metrics`), `overall`, `market_open`, and per account `kpis`: `trades_today`,
+  `days_traded_7d` / `_30d`, `profitable_days_7d` / `_30d` (day blocks with `net_pct` > 0), `reported_days_*`,
+  `weekdays_*`, `cur_losing_streak`, `dd_week_pct`, `dd_mtd_pct`. EA ages are open-market hours (gold closed Friday
+  21:00 to Sunday 23:00 UTC). Rewritten only when a status, a reason or a KPI changes. Aggregate data only.
 * `docs/dashboard/data.json` (`aggregates`): per account the daily series, the latest `week` and `mtd`, per-month `mtd`
   blocks, an all-time merge, and the `mtd` method/phase/grid tables.
 

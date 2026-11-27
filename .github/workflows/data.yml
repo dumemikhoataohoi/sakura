@@ -43,3 +43,14 @@ jobs:
           bash scripts/commit_push.sh "$RUNNER_TEMP/commit_msg.txt" \
             "python scripts/build_latest.py --msg-file $RUNNER_TEMP/commit_msg.txt" \
             data/
+
+      # GitHub agent self-monitoring (docs/agents.md): reads repo files only, no event text, no extra permission.
+      # Rewrites reports/agents/<UTC date>.md/.json only when a status, a reason or a KPI changed.
+      - name: Agent health and daily KPIs (commit only on change)
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          python scripts/agents_status.py --msg-file "$RUNNER_TEMP/agents_msg.txt"
+          bash scripts/commit_push.sh "$RUNNER_TEMP/agents_msg.txt" \
+            "python scripts/agents_status.py --msg-file $RUNNER_TEMP/agents_msg.txt" \
+            reports/agents/

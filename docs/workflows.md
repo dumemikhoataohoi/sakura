@@ -10,6 +10,10 @@ All three workflows use only the built-in `GITHUB_TOKEN`, with the smallest perm
 * Steps: `python scripts/build_latest.py --msg-file ...` then `scripts/commit_push.sh` on `data/`.
   * The commit message lists the series that moved, e.g. `data: DGS10 4.92->4.91 (2026-11-24); VIXCLS 35.89->26.62 (2026-11-23)`.
   * Nothing is committed when nothing changed. Expect a few commits per day (new FRED prints, calendar roll, daily heartbeat).
+* Then `python scripts/agents_status.py --msg-file ...` and `scripts/commit_push.sh` on `reports/agents/` (a second commit):
+  GitHub agent self-monitoring, one health row per agent / sub-agent of `docs/agents.md` plus the daily KPIs. It reads repo
+  files only (no event text, no extra permission) and rewrites the day's file only when a status, a reason or a KPI changed,
+  so it commits on change (and once per UTC day), not every hour.
 * Failure modes: a FRED outage keeps the history and the previous values (warning in `quality.json`); a range/spike/schema
   error keeps the previous `latest.json` and writes `quality.json` (alert). In public repositories GitHub disables scheduled
   workflows after 60 days without repository activity; the data commits normally keep the repo active.

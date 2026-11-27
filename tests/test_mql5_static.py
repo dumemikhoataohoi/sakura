@@ -241,6 +241,56 @@ class Mql5StaticTest(unittest.TestCase):
         self.assertIn("return(m == ZGB_SIDE_SELL);", allowed)
 
 
+    def test_bridge_27_by_side_and_session(self):
+        # bridge 2.7: by_side (coordinator R09) and by_session aggregates; session bands = agg.SESSION_BANDS_UTC
+        import agg
+        self.assertRegex(self.mqh, r'#define ZGB_VERSION "2\.[7-9]"')
+        self.assertIn("#define ZGB_HAS_BYSIDE", self.mqh)
+        self.assertIn("#define ZGB_HAS_SESSION", self.mqh)
+        bands = {name: int(h) for name, h in re.findall(r"^#define ZGB_SESS_(\w+)_H\s+(\d+)", self.mqh, re.M)}
+        self.assertEqual(bands, {label: h for h, label in agg.SESSION_BANDS_UTC})
+        so = self._body("string ZGB_SessionOf(const datetime t_utc)")
+        chain = re.findall(r'if\(d\.hour >= ZGB_SESS_(\w+)_H\)\s*return\("(\w+)"\);', so)
+        self.assertTrue(chain)
+        self.assertTrue(all(a == b for a, b in chain))                       # each band returns its own label
+        self.assertEqual([bands[a] for a, _ in chain], sorted((bands[a] for a, _ in chain), reverse=True))
+        fallback = re.findall(r'\n\s*return\("(\w+)"\);\s*\}$', so)
+        self.assertEqual(fallback, [agg.SESSION_BANDS_UTC[0][1]])
+
+        def session_of(hour: int) -> str:                                    # emulate the MQL5 if-chain
+            for name, label in chain:
+                if hour >= bands[name]:
+                    return label
+            return fallback[0]
+        for hour in range(24):
+            self.assertEqual(session_of(hour), agg.session_of(hour), hour)
+        self.assertIn('return(side > 0 ? "buy" : "sell");', self._body("string ZGB_SideKey(const int side)"))
+        self.assertEqual(set(agg.AGG_SIDES), {"buy", "sell"})
+        lp = self._body("int ZGB_LoadPositions(")
+        self.assertIn("ps[n].side = buy ? 1 : -1;", lp)
+        self.assertIn("ps[n].sess = ZGB_SessionOf((datetime)ZGB_ToUtc(t_in));", lp)   # entry time in UTC, as the grid
+        aj = self._body("string ZGB_AggJson(")
+        self.assertIn("ZGB_GroupAdd(sdk, sdn, sdw, sdr, sdo, ZGB_SideKey(ps[i].side), oc, rr);", aj)
+        self.assertIn("ZGB_GroupAdd(ssk, ssn, ssw, ssr, sso, ps[i].sess, oc, rr);", aj)
+        self.assertIn('",\\"by_side\\":" + ZGB_GroupJson(sdk, sdn, sdw, sdr, sdo)', aj)
+        self.assertIn('",\\"by_session\\":" + ZGB_GroupJson(ssk, ssn, ssw, ssr, sso)', aj)
+        self.assertIn("ZGB_GroupJson(xk, xn, xw, xr, xo), ext, grid);", aj)
+        # an additional dimension only: the phase key and the control lookups never see the session
+        for sig in ("string ZGB_PhaseKey(const string phase)", "int ZGB_CtlDirective(", "string ZGB_CodeForComment(const string cmt)"):
+            body = self._body(sig)
+            self.assertNotIn("Session", body)
+            self.assertNotIn("sess", body)
+        self.assertIn("ps[n].phase = g_zgbXPh[xi];", lp)                     # the phase stays the EA's own label
+
+    def test_inputs_unchanged_and_short(self):
+        # 2.7 adds no input (the EA is at 1020 of 1024 inputs with the bridge's 41); string inputs <= 255 characters
+        self.assertEqual(len(re.findall(r"^input\s", self.mqh, re.M)), 41)    # 38 parameters + 3 "input group" lines
+        inputs = re.findall(r"^input\s+(\w+)\s+(\w+)\s*=\s*(.*?);", self.mqh, re.M)
+        self.assertEqual(len(inputs), 38)
+        for typ, name, value in inputs:
+            if typ == "string":
+                self.assertLessEqual(len(value.strip().strip('"')), 255, name)
+
     def test_phase_key_matches_server(self):
         # emulate ZGB_PhaseKey and compare with agg._phase_key on the EA labels and odd input
         import agg

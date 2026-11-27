@@ -63,6 +63,7 @@ account; the repository stores each one that changed (one commit each) and skips
 | `ZGB_SetMarketCtx(json)` | 2.4: market-context object sent as `mkt.ctx` in every report (EA161 v1.31 calls it on each new M15 bar). Accepted only as one JSON object <= 1800 bytes of `[A-Za-z0-9_:.,{}[]"-]`; otherwise the last good block is kept. Fields: see `docs/data-dictionary.md` |
 | `ZGB_SetShadowStats(json)` | 2.5: blocked-signal shadow statistics sent as `data.shadow` in aggregate reports (EA161 v1.32 calls it on each new M15 bar and at most every 5 min after a change). Same charset rule as the market context, <= 8000 bytes; otherwise the last good block is kept. Fields: see `docs/data-dictionary.md` |
 | `ZGB_SideMode()`, `ZGB_SideAllowed(side)`, `ZGB_SideName(mode)` | 2.6 (`#define ZGB_HAS_SIDE`): `global.side` in force (`ZGB_SIDE_BOTH 0`, `ZGB_SIDE_BUY 1`, `ZGB_SIDE_SELL -1`, `ZGB_SIDE_AUTO 2`; NEUTRAL / expired / stale / tester = both). `ZGB_SideAllowed(+1/-1)` is true for both, auto (the EA then applies its own CDS) and the matching side. EA161 v1.33 checks it for NEW entries of its magics inside its control step (reason `SIDE` in the shadow statistics); the bridge itself never trades |
+| `ZGB_SessionOf(t_utc)`, `ZGB_SessionNow()` | 2.7 (`#define ZGB_HAS_SESSION`): `ASIA` / `LON` / `NY` / `OFF` from the UTC hour bands `ZGB_SESS_ASIA_H 0`, `ZGB_SESS_LON_H 8`, `ZGB_SESS_NY_H 12`, `ZGB_SESS_OFF_H 20` (= `scripts/agg.py` `SESSION_BANDS_UTC`). Use it for the EA's shadow cells `shadow.by_session` (`"SESS:REASON"`) so they match the report's `by_session` |
 | `ZGB_Log(s)` | phase/analysis log line: sent only in mode 1 (in mode 0 it is discarded at each report) |
 | `ZGB_Flag(key, msg)` | EA-raised alert: next report (-> alerts PR comment) and Telegram/Discord. In mode 0 `msg` is published: no prices in it |
 | `ZGB_SendReport(reason)` | build a report now (queued; flushed by `ZGB_OnTimer`). In mode 0 prefer the automatic slots |
@@ -125,12 +126,40 @@ or (within the cap) scale what the EA would do anyway. Inputs: `InpGhControlEnab
 * **Strategy Tester.** WebRequest does not work there; `ZGB_Init` disables the module and `ZGB_ReadLatest` returns
   `false` ("tester"). For backtests use `data/history/*.csv` and `data/calendar/events_us.csv` offline.
 
+## Side and session aggregates (bridge 2.7)
+
+`#define ZGB_HAS_BYSIDE` / `ZGB_HAS_SESSION` mark the 2.7 API. Every aggregate block (`day`, `week`, `mtd`, `r30`) gains two
+groups with the same fields as `by_method` (`n`, `wins`, `win_pct`, `net_r`, `cur_ls`, `l20_n`, `l20_wins`):
+
+* `by_side`: keys `buy` / `sell`, the direction of the position's entry deal. The coordinator sums the stored `day` blocks of
+  the last 14 days and sets `global.side=auto` (R09) when one side's Wilson upper bound is below 45 % with n >= 30.
+* `by_session`: keys `ASIA` / `LON` / `NY` / `OFF`, the session of the entry time (UTC). Each band starts on a 4-hour
+  `grid` bucket, so session x grid never isolates an entry hour; the label is an additional dimension only: `ZGB_PhaseKey`,
+  the `by_phase` / `by_method_phase` keys and every control code stay exactly as in 2.6.
+
+Both come from the deal history (entry deal type and time) at each report, so restarts lose nothing and no local file
+changes. No new input (41 `input` lines, of which 3 are groups), no price, ticket, time or method name. `scripts/agg.py`
+whitelists both (any other key is dropped and logged as `<invalid>`, never by name); an older server would drop
+`by_session` the same way. An EA compiled with a 2.6 bridge simply sends neither.
+
 ## Not compiled here
 
 The module was reviewed statically (`tests/test_mql5_static.py` lints braces, function definitions, the WebRequest
 signature, char-array conversions, `StringFormat` arity, safe defaults, and that the aggregate builder contains no
 per-trade fields), but it has **not** been compiled in MetaEditor in this environment. Compile it once and report any
 error.
+
+Compile watch points for 2.7:
+
+* `ZgbPos` gained `int side` and `string sess`; every `ZgbPos` is filled field by field in `ZGB_LoadPositions` (no
+  initializer list), so no other code needs a change. Check for "struct has no member" if an EA copies `ZgbPos` itself.
+* `ZGB_SessionOf`, `ZGB_SessionNow` and `ZGB_SideKey` are defined before their first use (after `ZGB_PhaseKey`); the names
+  must not clash with functions of the host EA (EA161 is not in this repo: check for "function already defined").
+* `ZGB_AggJson`: the big `StringFormat` now has 30 arguments (the `ext` string for `by_side` / `by_session` before `grid`),
+  under MQL5's 64-argument limit; the static test checks placeholder / argument parity.
+* `ZGB_SessionOf((datetime)ZGB_ToUtc(t_in))`: `ZGB_ToUtc` returns `long`, the explicit cast avoids the implicit-conversion
+  warning.
+* The payload grows by about 0.5 KB per block (about 2 KB per report), far below `InpGhMaxPayloadBytes` (30000).
 
 ## Open-risk cap (bridge 2.3)
 
