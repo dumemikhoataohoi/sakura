@@ -99,3 +99,4 @@ Cập nhật lần cuối: 2026-11-27.
 | F5 | Bảo mật: không đưa token, số tài khoản, email lên repo hay vào chat; repo công khai chỉ nhận báo cáo tổng hợp | ✅ |
 | F6 | **Rà soát file này trước khi điều phối hoặc nâng cấp; mục nào 🟡 hoặc ❌ thì nêu trong báo cáo** | ✅ |
 | F7 | Cách báo cáo: **hướng giải pháp**. Mỗi điểm yếu luôn đi kèm cách cải thiện cụ thể và việc đang làm; không chỉ nói "không tốt". Số liệu vẫn phải thật | ✅ |
+| F8 | **Nghiên cứu nguồn ngoài** (2026-11-27): tìm dữ liệu mới, chiến lược, mã mở trên mạng/GitHub, hội nhóm trade bot. Nguồn đã đọc ghi vào `docs/research-sources.md` và **không đọc lại**. Tiết kiệm token: tìm kiếm có trích đoạn trước, chỉ đọc toàn văn khi cần; dùng skills/connectors có sẵn | 🟡 đang làm |
