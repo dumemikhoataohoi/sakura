@@ -155,3 +155,46 @@ Ghi riêng:
 6. Mục tiêu đã đạt, chưa đạt, và phần còn phải kiểm chứng.
 
 Chưa đạt thì tiếp tục nghiên cứu theo hướng có cơ sở. Không sửa số liệu. Không tự triển khai lên tài khoản thật.
+
+## 10. Bổ sung mục tiêu thiết kế (người dùng, 27/11/2026)
+
+EA phải **thích ứng** với thị trường thay đổi: có nhiều phương pháp được nghiên cứu riêng, rồi dùng phân tích đa khung để nhận biết thị trường và điều phối phương pháp phù hợp. Không dùng vài phương pháp cố định cho mọi điều kiện.
+
+### 10.1 Vai trò của từng khung
+- **Khung lớn:** bối cảnh, xu hướng, trạng thái (tăng / giảm / đi ngang / đang chuyển).
+- **Khung trung gian:** giá đang tiếp diễn, điều chỉnh hay có khả năng đảo chiều.
+- **Khung nhỏ:** điểm vào cụ thể, tránh mua đuổi đỉnh hoặc bán đuổi đáy.
+
+Khi các khung ngược hướng, phải có quy tắc phân biệt **nhịp điều chỉnh** với **khả năng đổi xu hướng**. Không mặc định chặn mọi lệnh ngược khung lớn; kiểm tra từng trường hợp bằng dữ liệu.
+
+Thử nhiều tổ hợp khung (ví dụ H1–M15–M1) và so sánh với các tổ hợp khác cũng như với EA **không** dùng điều phối đa khung. Chỉ dùng thông tin đã có tại thời điểm vào lệnh.
+
+### 10.2 Phương pháp và điều phối
+Nghiên cứu từng phương pháp độc lập trước. Mỗi phương pháp có công thức gồm: điều kiện thị trường, chỉ báo hoặc cấu trúc giá, hướng, điểm vào, SL, TP, điều kiện thoát.
+
+Sau khi lọc 12 tháng, kiểm tra phương pháp nào hợp với trạng thái nào. Khi ghép vào EA phải quy định rõ:
+- chọn phương pháp theo trạng thái và đa khung như thế nào;
+- xử lý khi nhiều phương pháp cùng ra tín hiệu hoặc ra tín hiệu ngược hướng;
+- xử lý khi trạng thái chưa rõ;
+- giới hạn lệnh trùng ý tưởng và tổng rủi ro;
+- lý do chọn phương pháp, vào lệnh hoặc bỏ qua tín hiệu (ghi nhật ký).
+
+Đo riêng từng tầng và so với từng phương pháp chạy cố định. Không mặc định rằng thêm tầng là tốt hơn.
+
+### 10.3 Tiêu chí chọn bản mới
+- **Chốt tiêu chí trước khi tối ưu:** lãi ròng, số lệnh, tỷ lệ thắng, DD, chuỗi thua, ngày/tuần/tháng lỗ.
+- Kiểm tra độ ổn định tham số, kết quả từng tháng, và một giai đoạn ngoài mẫu **chưa tham gia chọn phương án**.
+- Ghi lại **mọi phương án đã thử**, kể cả phương án bị loại.
+- Chỉ kết luận tốt hơn khi so sánh công bằng. Chỉ số này tốt hơn mà chỉ số khác xấu đi thì báo rõ mức đánh đổi.
+
+### 10.4 Kiểm tra vận hành (báo riêng với kết quả chiến lược)
+Các tình huống cần kiểm tra:
+- mất kết nối;
+- khởi động lại EA/terminal;
+- lệnh trùng;
+- broker phản hồi chưa rõ (timeout, requote);
+- nạp/rút tiền;
+- spread giãn, trượt giá;
+- lot tối thiểu.
+
+Trước khi người dùng chạy: bảng so sánh với EA gốc, kèm danh sách các bước **đã** và **chưa** kiểm chứng. Không cam kết live giống backtest; phải đo và giải thích sai khác.
