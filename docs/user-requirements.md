@@ -94,6 +94,7 @@ Cập nhật lần cuối: 2026-11-27.
 | A16 | **Thêm phương pháp tốt hơn nếu có** (2026-11-27), mục tiêu trên 100 lệnh/tháng | 🟡 tìm nguồn ngoài vòng 2 + v1.50 |
 | A17 | **Giới hạn dùng tuần ~75% thì dừng nghiên cứu** (2026-11-27) và dựng ngay **EA tốt nhất hiện có** để người dùng cài. Ưu tiên: 100 lệnh/tháng, thắng ≥ 60%. Claude không đọc được đồng hồ hạn mức → người dùng báo "75%", hoặc Claude dừng sau v1.50 rồi dựng bản tốt nhất | 🟡 |
 | A18 | **Nới ràng buộc theo trả lời của người dùng (2026-11-27):** (a) tỉ lệ SL/TP được trong khoảng 0,67–1,5 nếu lãi sau phí và sụt giảm tốt hơn (không bắt buộc 1:1); (b) mục tiêu số lệnh > 100/tháng, hướng tới 500/tháng (có điều phối hỗ trợ); (c) 1% là giới hạn **từng lệnh**: được nhiều lệnh cùng chiều với trần tổng rủi ro mở; (d) EA được tự dời SL về hòa vốn và tự thoát theo thời gian theo luật cố định; (e) EA nghe điều phối; ưu tiên: lãi tốt, bảo vệ vốn và lãi. Vẫn giữ: không hedge, không gấp thếp/lưới/nhồi lệnh khi lỗ, không mở/đóng lệnh từ xa. **Đánh giá mới bắt buộc:** đo lợi thế theo R vượt so với vào lệnh ngẫu nhiên cùng chiều/giờ (trừ xu hướng), vì v1.69 cho thấy ~68% lãi D7 của v1.53 là do xu hướng tăng của vàng | 🟡 v1.70 |
+| A19 | **Mục tiêu 500–1000 lệnh/tháng** (2026-11-27, bắt buộc theo người dùng) để điều phối có đủ lệnh mà chọn và học. Thiết kế 2 tầng: tầng chính (v1.53, rủi ro thường) và tầng khám phá (mọi họ lệnh, rủi ro rất nhỏ ≤0,05–0,1%/lệnh, nhiều lệnh cùng chiều, tổng rủi ro mở ≤1%, dừng ngày −0,5%). Giới hạn cứng giữ nguyên | 🟡 v1.73 đang mô phỏng |
 
 ## F. Cách làm việc
 
