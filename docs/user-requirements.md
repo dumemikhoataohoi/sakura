@@ -26,7 +26,7 @@ Cập nhật lần cuối: 2026-11-27.
 | B1 | Nhận diện giai đoạn **đa khung** (W1/D1/H4/H1/M15): xu hướng, sức mạnh, biến động, vị trí | ✅ EA (nhãn giai đoạn, ô 15 bit) |
 | B2 | Mô hình nến khung lớn (nhấn chìm, pin, inside, outside, doji, quét đỉnh/đáy) và chỉ báo khung lớn (RSI/MACD/Stoch/BB/EMA200/ADX-DI/Ichimoku) | ✅ EA (bảng thông tin) |
 | B3 | Theo từng giai đoạn: tự áp dụng, điều chỉnh hoặc **tạm dừng** phương pháp; rủi ro, giới hạn và tạm dừng khi thua theo giai đoạn | ✅ Mặt nạ giai đoạn + kênh điều phối |
-| B4 | **≥ 3 kịch bản tương lai** (tiếp diễn / hồi rồi tiếp / đảo chiều) có xác suất và mức giá | 🟡 Có trên bảng thông tin, nhưng hướng chỉ đúng ~50% nên đang chỉ hiển thị. v1.31 gửi lên GitHub để chấm điểm hằng ngày |
+| B4 | **≥ 3 kịch bản tương lai** (tiếp diễn / hồi rồi tiếp / đảo chiều) có xác suất và mức giá, **dựng từ tin tức + nến + đa khung + mô hình**, dùng làm cơ sở điều phối lệnh | 🟡 Bảng thông tin của EA có 3 kịch bản, nhưng chỉ dựa trên các đoạn quá khứ tương tự (hướng đúng ~50%). Từ 27/11 Claude tự dựng 3 kịch bản ở mỗi lần điều phối, ghi vào sổ và chấm điểm lần sau. Thứ Bảy nghiên cứu bộ kịch bản v2 trong EA |
 | B5 | Bộ nhớ tự học: lưu từng tháng (giai đoạn, đảo chiều, biến động, cái gì hiệu quả) và mô phỏng dựa trên các đoạn quá khứ tương tự | ✅ ZumiMem + K-NN (chỉ hiển thị) |
 | B6 | Thư viện phương pháp rất lớn cho mọi chế độ thị trường, kể cả tin tức (NFP/CPI/FOMC) và **thiên nga đen** | ✅ 188 phương pháp trong v1.30 + lớp phòng khủng hoảng |
 | B7 | EA đóng vai **chuyên gia phân tích**: bảng thông tin + log (giai đoạn từng khung, kịch bản, phương pháp đang bật/dừng, lý do) | ✅ |
