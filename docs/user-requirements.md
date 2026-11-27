@@ -92,6 +92,7 @@ Cập nhật lần cuối: 2026-11-27.
 | E6 | **Chức vụ như công ty thực thụ, KPI tăng trưởng mỗi ngày** (2026-11-27): sơ đồ chức vụ CEO/CRO/COO/CFO/CTO…; mục tiêu KPI tự nâng khi đạt liên tục, không hạ sàn; KPI rủi ro chỉ giữ hoặc siết. `docs/agents.md` 6.1–6.2 | 🟡 tài liệu xong; nâng mục tiêu tự động đang làm |
 | A16 | **Thêm phương pháp tốt hơn nếu có** (2026-11-27), mục tiêu trên 100 lệnh/tháng | 🟡 tìm nguồn ngoài vòng 2 + v1.50 |
 | A17 | **Giới hạn dùng tuần ~75% thì dừng nghiên cứu** (2026-11-27) và dựng ngay **EA tốt nhất hiện có** để người dùng cài. Ưu tiên: 100 lệnh/tháng, thắng ≥ 60%. Claude không đọc được đồng hồ hạn mức → người dùng báo "75%", hoặc Claude dừng sau v1.50 rồi dựng bản tốt nhất | 🟡 |
+| A18 | **Nới ràng buộc theo trả lời của người dùng (2026-11-27):** (a) tỉ lệ SL/TP được trong khoảng 0,67–1,5 nếu lãi sau phí và sụt giảm tốt hơn (không bắt buộc 1:1); (b) mục tiêu số lệnh > 100/tháng, hướng tới 500/tháng (có điều phối hỗ trợ); (c) 1% là giới hạn **từng lệnh**: được nhiều lệnh cùng chiều với trần tổng rủi ro mở; (d) EA được tự dời SL về hòa vốn và tự thoát theo thời gian theo luật cố định; (e) EA nghe điều phối; ưu tiên: lãi tốt, bảo vệ vốn và lãi. Vẫn giữ: không hedge, không gấp thếp/lưới/nhồi lệnh khi lỗ, không mở/đóng lệnh từ xa. **Đánh giá mới bắt buộc:** đo lợi thế theo R vượt so với vào lệnh ngẫu nhiên cùng chiều/giờ (trừ xu hướng), vì v1.69 cho thấy ~68% lãi D7 của v1.53 là do xu hướng tăng của vàng | 🟡 v1.70 |
 
 ## F. Cách làm việc
 
