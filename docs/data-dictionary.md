@@ -123,6 +123,7 @@ most 10):
 | `mkt` | `sym`, `move_atr` (today's move vs previous D1 close in ATR14(D1) units), optional `ctx` (bridge 2.4, below). No prices. |
 | `periods.day` / `.week` / `.mtd` / `.r30` | aggregate block for today (server day), the rolling last 7 days, month to date, the rolling last 30 days (coordinator input) |
 | `flags[]` | `{key, msg}` raised by the EA with `ZGB_Flag()` (published: keep prices out of `msg`) |
+| `shadow` | optional (bridge 2.5 / EA161 v1.32): blocked-signal shadow statistics, below |
 
 `mkt.ctx`: EA market context (EA161 v1.31 / bridge 2.4), rebuilt on each new M15 bar from the EA's analyst state.
 Only bucketed or relative values: **no prices, no times, no method names**. `scripts/agg.py` (`sanitize_ctx`) checks every
@@ -146,6 +147,31 @@ key, range and code; anything else is dropped and only its key name is logged. T
 The daily page renders the last context of the day and a scenario log of every report of the day. A `heartbeat` that is
 identical to the previous stored report of that account and day (apart from `ts`) is not stored, so it creates no commit.
 
+`shadow`: blocked signals traded virtually (EA161 v1.32 / bridge 2.5, `ZGB_SetShadowStats`). Every signal that reached
+the EA's order entry and was **not** sent gets one reason and a virtual trade with the SL of the order and the TP the order
+would have had (EA135: 1R with `InpEA135ExitMode=1`), resolved on closed M1 bars: first touch of SL or TP (both in one bar =
+SL), 24 h time-out (and the Friday flat) = the R at that bar's close. Counted on the server day the virtual trade closed, like
+real trades. Counts and R only: **no prices, no times, no method names**. Size <= 8 KB.
+
+| key | meaning |
+|---|---|
+| `v`, `open` | schema `1`; virtual trades still open |
+| `periods.day` / `.week` / `.mtd` / `.r30` | `{REASON: {n, wins, losses, to, net_r}}` (same windows as the aggregate blocks; `to` = time-outs; win = R > 0, loss = R < 0) |
+| `by_method` | rolling 30 days, top 30 cells by `n`: `{"M###:REASON": {n, wins, net_r}}` (method code from the entry comment, the same code as real trades' `by_method`) |
+| `by_phase` | rolling 30 days, top 40: `{"PHASE:REASON": {n, wins, net_r}}`, PHASE as `mkt.ctx.phase` (`[A-Z]{2,8}`) or `none` |
+
+Reasons (first block wins, in the EA's order): `CAP` base-slot pre-check (MaxOpen, same entry, NO-STACK); then at the order
+entry `CELL` (phase cell mask off, S4 direction / pullback), `NEWS` (news-day veto, crisis NewsFlat window), `CAP` (max per
+method, max open = open-risk cap, one entry per minute and side, EA131 aggregate risk / margin), `BREAKER` (bad-month
+breaker), `CTRL` (control channel: pause, disabled, `risk_mult` 0, extra news block), `SPREAD` (crisis spread spike, EA131
+spread limit, EA136 spread-to-risk), `CRISIS` (volatility, gap, day/week stop, max same side), `OTHER` (weekend cut, EA134 /
+EA136 / EA135, broker). A NEWS / CAP signal whose phase cell is off counts as `CELL`; signals of methods that are not in the
+active selection are not recorded. Engine-local pre-checks inside modules, lanes and M1 engines are not counted.
+Validator (`agg.sanitize_shadow`): reason vocabulary, `M\d{3}` and phase regexes, `wins + losses <= n`, `|net_r| <= 2.5 x n`,
+list caps; anything else is dropped (key names only are logged, cell keys as `<invalid>`). The daily / weekly / monthly pages
+render "Blocked signals (shadow)" for `day` / `week` / `mtd`: per reason blocked n, shadow win% and R next to the real trades
+of the same period. Tests: `tests/test_shadow.py`.
+
 Aggregate block (positions that are fully closed, counted at their last exit):
 
 | key | meaning |
@@ -167,7 +193,9 @@ Aggregate block (positions that are fully closed, counted at their last exit):
 
 **Method codes.** The EA turns each method name (the entry comment) into `M001`..`M999`, derived from a salted hash and
 recorded in the local file `MQL5\Files\zumi_method_codes.csv` (`code,name`). That file stays on the user's PC and is never
-committed. `M000` = no comment / unknown.
+committed. `M000` = no comment / unknown. Bridge 2.5 / EA161 v1.32: the control channel looks codes up through the same
+function (`ZGB_CodeForComment`, the entry's order comment), so `control.json` codes taken from `by_method` hit those entries.
+Base-slot and module comments carry the side (`L` / `S`), so their codes are per side.
 
 **Validator** (`scripts/agg.py`, whitelist): unknown keys are dropped wherever they appear and their key names (never the
 values) are printed in the workflow log. Specifically it strips `trades`, `log`, prices, times, tickets, comments, absolute

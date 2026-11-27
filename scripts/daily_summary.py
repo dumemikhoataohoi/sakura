@@ -340,6 +340,60 @@ def ctx_section(rep: dict, day_reports: list[dict]) -> list[str]:
     return out
 
 
+SHADOW_PERIOD_NAME = {"day": "today", "week": "rolling 7 days", "mtd": "month to date"}
+
+
+def _wpct(w: int, l: int):
+    return round(100.0 * w / (w + l), 1) if w + l else None
+
+
+def shadow_section(rep: dict, pkey: str, real: dict) -> list[str]:
+    """Blocked signals (bridge 2.5 data.shadow): per block reason, how the signals the EA did NOT take would have done as virtual 1R
+    trades (same SL, TP as the order would have had, 24 h time-out), next to the real trades of the same period."""
+    sh = (rep.get("data") or {}).get("shadow") or {}
+    if not sh:
+        return []
+    rows = (sh.get("periods") or {}).get(pkey) or {}
+    out = [f"#### Blocked signals (shadow), {SHADOW_PERIOD_NAME.get(pkey, pkey)}", "",
+           "Signals the EA blocked, traded virtually with the same SL and TP (first touch on closed M1 bars, 24 h time-out at its R). "
+           "Attributed to the day the virtual trade closed. A shadow win% above the real win% means the block cost trades; below means it helped.", ""]
+    rw, rl = real.get("wins", 0) or 0, real.get("losses", 0) or 0
+    real_wp = _wpct(rw, rl)
+    real_avg = round(real["net_r"] / real["n"], 3) if real.get("n") and real.get("net_r") is not None else None
+    if not rows:
+        out += [f"No blocked signal resolved in this period ({sh.get('open', 0)} virtual trades still open).", ""]
+        return out
+    out += ["| reason | blocked n | W / L | time-outs | shadow win% | net R | avg R | vs real win% (pp) |", "|---|---|---|---|---|---|---|---|"]
+    tot = {"n": 0, "wins": 0, "losses": 0, "to": 0, "net_r": 0.0}
+    for rs in agg.SHADOW_REASONS:
+        r = rows.get(rs)
+        if not r:
+            continue
+        for k in tot:
+            tot[k] += r.get(k, 0) or 0
+        wp = _wpct(r.get("wins", 0), r.get("losses", 0))
+        diff = round(wp - real_wp, 1) if wp is not None and real_wp is not None else None
+        out.append(f"| {rs} | {r['n']} | {r.get('wins', 0)} / {r.get('losses', 0)} | {r.get('to', 0)} | {f(wp, 1)} | "
+                   f"{f(r.get('net_r'), 2, True)} | {f(r['net_r'] / r['n'], 3, True)} | {f(diff, 1, True)} |")
+    wp = _wpct(tot["wins"], tot["losses"])
+    diff = round(wp - real_wp, 1) if wp is not None and real_wp is not None else None
+    out.append(f"| all blocked | {tot['n']} | {tot['wins']} / {tot['losses']} | {tot['to']} | {f(wp, 1)} | "
+               f"{f(tot['net_r'], 2, True)} | {f(tot['net_r'] / tot['n'], 3, True)} | {f(diff, 1, True)} |")
+    out.append(f"| real trades | {real.get('n', 0)} | {rw} / {rl} | - | {f(real_wp, 1)} | {f(real.get('net_r'), 2, True)} | "
+               f"{f(real_avg, 3, True)} | - |")
+    out += ["", f"Virtual trades still open: {sh.get('open', 0)}.", ""]
+    for title, key in (("By method code x reason (rolling 30 days, top 10 by n)", "by_method"),
+                       ("By phase x reason (rolling 30 days, top 10 by n)", "by_phase")):
+        cells = sh.get(key) or {}
+        if not cells:
+            continue
+        out += [f"##### {title}", "", "| cell | n | shadow win% (wins / n) | net R |", "|---|---|---|---|"]
+        for k, c in sorted(cells.items(), key=lambda kv: (-kv[1]["n"], kv[0]))[:10]:
+            out.append(f"| {md_escape(k)} | {c['n']} | {f(100.0 * c.get('wins', 0) / c['n'], 1)} | {f(c.get('net_r'), 2, True)} |")
+        out.append("")
+    return out
+
+
 def agg_reports(root: Path, first: dt.date, last: dt.date) -> list[dict]:
     return [r for r in rl.load_reports(root, first, last) if r.get("kind") == "ea_agg"]
 
@@ -401,6 +455,7 @@ def summarize(root: Path, dates: list[dt.date], cfg: dict | None = None) -> list
                      for fl in x["data"].get("flags", [])}
             parts[acct] = agg_section(acct, f"day {day.isoformat()}", r["data"]["periods"].get("day", {"n": 0}), r,
                                       [flags[k] for k in sorted(flags)])
+            parts[acct] += shadow_section(r, "day", r["data"]["periods"].get("day", {"n": 0}))
             parts[acct] += ctx_section(r, [x for x in reps if x["acct"] == acct and x["data"]["day"] == day.isoformat()])
         text = render_page(f"Zumi daily report {day.isoformat()} (UTC)", "daily", per, cfg, events, extras, hist, parts)
         path = root / "reports" / "daily" / f"{day.isoformat()}.md"
@@ -419,6 +474,7 @@ def summarize(root: Path, dates: list[dt.date], cfg: dict | None = None) -> list
                 days = last_by_acct_all(reps, acct, lambda d: iso_week(d) == wk)
                 week = agg.merge_aggs([x["data"]["periods"].get("day", {"n": 0}) for x in days])
             parts[acct] = agg_section(acct, f"rolling 7 days ending {r['data']['day']}", week, r)
+            parts[acct] += shadow_section(r, "week", week)
         text = render_page(f"Zumi weekly report {wk} (UTC)", "weekly", per, cfg, events, agg_parts=parts)
         path = root / "reports" / "weekly" / f"{wk}.md"
         if write_if_changed(path, text):
@@ -432,6 +488,7 @@ def summarize(root: Path, dates: list[dt.date], cfg: dict | None = None) -> list
         parts = {}
         for acct, r in last_by_acct(reps, lambda d: d.strftime("%Y-%m") == mo).items():
             parts[acct] = agg_section(acct, f"month to date {r['data']['day']}", r["data"]["periods"].get("mtd", {"n": 0}), r)
+            parts[acct] += shadow_section(r, "mtd", r["data"]["periods"].get("mtd", {"n": 0}))
         text = render_page(f"Zumi monthly report {mo} (UTC)", "monthly", per, cfg, events, agg_parts=parts)
         path = root / "reports" / "monthly" / f"{mo}.md"
         if write_if_changed(path, text):

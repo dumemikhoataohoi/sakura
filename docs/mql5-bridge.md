@@ -61,6 +61,7 @@ account; the repository stores each one that changed (one commit each) and skips
 | `ZGB_GetNumber(path, v)`, `ZGB_GetString(path, s)` | any field of the cached JSON, e.g. `"series.T10YIE.c5"`, `"events.next.0.ev"` |
 | `ZGB_SetPhase(s)` | current phase (recorded per position at entry, used for per-phase statistics) |
 | `ZGB_SetMarketCtx(json)` | 2.4: market-context object sent as `mkt.ctx` in every report (EA161 v1.31 calls it on each new M15 bar). Accepted only as one JSON object <= 1800 bytes of `[A-Za-z0-9_:.,{}[]"-]`; otherwise the last good block is kept. Fields: see `docs/data-dictionary.md` |
+| `ZGB_SetShadowStats(json)` | 2.5: blocked-signal shadow statistics sent as `data.shadow` in aggregate reports (EA161 v1.32 calls it on each new M15 bar and at most every 5 min after a change). Same charset rule as the market context, <= 8000 bytes; otherwise the last good block is kept. Fields: see `docs/data-dictionary.md` |
 | `ZGB_Log(s)` | phase/analysis log line: sent only in mode 1 (in mode 0 it is discarded at each report) |
 | `ZGB_Flag(key, msg)` | EA-raised alert: next report (-> alerts PR comment) and Telegram/Discord. In mode 0 `msg` is published: no prices in it |
 | `ZGB_SendReport(reason)` | build a report now (queued; flushed by `ZGB_OnTimer`). In mode 0 prefer the automatic slots |
@@ -80,7 +81,12 @@ account; the repository stores each one that changed (one commit each) and skips
 | `ZGB_ExtraNewsBlock(tUtc)` | inside a `block` window (only adds blocking) |
 | `ZGB_NewsAllowed(tUtc)` | inside an `allow` window and `InpGhAllowNewsOverride`; never when a block also covers `tUtc` |
 
-Method names are mapped to codes through the local map file (`ZGB_MethodCode`). Every applied file is logged
+Method names are mapped to codes through the local map file. **Bridge 2.5:** reports (the comment of each position's
+entry deal) and control lookups (EA161 v1.32 passes the order comment of the entry it is about to send) both go through
+`ZGB_CodeForComment` (cut a `[` broker suffix, keep 31 characters, then `ZGB_MethodCode`: trim, `,` -> space, salted hash),
+so a directive written with a report code hits exactly those entries; `phases` are compared with `ZGB_PhaseKey(label)`, the
+server's `by_phase` key (`SD|PB|N` -> `SDPBN`, empty -> `none`). Before 2.5 / v1.32 the EA asked about its internal method
+name and the raw `D1|H4|vol` label, so pauses from GitHub never matched. Every applied file is logged
 (`ZumiGitHubBridge control: M003 pause x0.00 phases[,TREND,] until ... (R01)`), including removed directives and the
 switch back to NEUTRAL. Local validation repeats the server rules (version, author, seq, updated time, 72 h staleness,
 7-day expiry, modes and bounds, window lengths, reason-code format); any problem means NEUTRAL. The loss stops, the
@@ -138,3 +144,15 @@ EA161 v1.30 uses it for every new entry.
 [CONTEXT], [SCEN], [VOL], [CRISIS]) at each H1 close and refreshes the M15 row on each new M15 bar, then calls
 `ZGB_SetMarketCtx`. It is reporting only: no gate, lot size, SL/TP or exit reads it. An EA compiled with a 2.3 bridge
 simply sends no context.
+
+## Blocked-signal shadow statistics (bridge 2.5)
+
+`#define ZGB_HAS_SHADOW` marks the 2.5 API. EA161 v1.32 records every signal that reached its order entry and was not
+sent (reason codes `CELL CTRL NEWS CRISIS CAP SPREAD BREAKER OTHER`), trades it virtually with the same SL and the TP the
+order would have had, resolves it on closed M1 bars only (24 h time-out) and keeps the open and resolved virtual trades in
+`MQL5\Files\ZumiMem\<symbol>_<magic base>\shadow132_open.csv` / `shadow132_res.csv` (40 days), so restarts lose nothing.
+It hands only counts and R to `ZGB_SetShadowStats`; the bridge adds them as `data.shadow` to aggregate reports (not to
+detail reports). A report over `InpGhMaxPayloadBytes` is rebuilt without `mkt.ctx` first, then also without `shadow`.
+Reporting only: no gate, lot size, SL/TP or exit reads it. Method codes come from the entry comment through the same
+salted-hash map as real trades. An EA compiled with a 2.4 bridge sends no shadow block. v1.32 also removes the v1.31
+mode-4 guards `InpClusterMin` / `InpRevVeto`.

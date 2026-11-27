@@ -168,8 +168,8 @@ class Mql5StaticTest(unittest.TestCase):
             self.assertNotIn(forbidden, code)                    # the bridge never trades
 
     def test_market_ctx_and_heartbeat(self):
-        # bridge 2.4: EA market context (mkt.ctx) + hourly heartbeat report
-        self.assertIn('#define ZGB_VERSION "2.4"', self.mqh)
+        # bridge 2.4: EA market context (mkt.ctx) + hourly heartbeat report (still present in 2.5)
+        self.assertRegex(self.mqh, r'#define ZGB_VERSION "2\.[4-9]"')
         self.assertIn("#define ZGB_HAS_MKTCTX", self.mqh)
         setter = self._body("void ZGB_SetMarketCtx(const string json_obj)")
         self.assertIn("ZGB_CTX_MAX", setter)                     # size limit
@@ -185,6 +185,53 @@ class Mql5StaticTest(unittest.TestCase):
         agg = self._body("bool ZGB_BuildAggReport(")
         self.assertIn("InpGhMaxPayloadBytes", agg)               # payload limit kept: rebuilt without ctx when too big
         self.assertIn("ZGB_MarketJson(false, false)", agg)
+
+    def test_shadow_stats(self):
+        # bridge 2.5: blocked-signal shadow statistics (data.shadow), reporting only
+        self.assertIn('#define ZGB_VERSION "2.5"', self.mqh)
+        self.assertIn("#define ZGB_HAS_SHADOW", self.mqh)
+        self.assertIn("#define ZGB_SHADOW_MAX 8000", self.mqh)
+        setter = self._body("void ZGB_SetShadowStats(const string json_obj)")
+        self.assertIn("ZGB_SHADOW_MAX", setter)                  # size limit
+        self.assertIn("'{'", setter)                             # one JSON object only
+        self.assertNotIn("' '", setter)                          # no spaces / free text in the allowed charset
+        self.assertIn("g_zgbShadow = json_obj;", setter)
+        agg = self._body("bool ZGB_BuildAggReport(")
+        self.assertIn('",\\"shadow\\":" + g_zgbShadow', agg)     # data.shadow in the aggregate report only
+        self.assertIn("for(int pass = 0; pass < 3; pass++)", agg)
+        self.assertIn('shd = "";', agg)                          # dropped (after mkt.ctx) when the body is too big
+        self.assertNotIn("g_zgbShadow", self._body("bool ZGB_BuildDetailReport("))
+
+    def test_one_comment_to_code_path(self):
+        # 2.5: report codes (entry deal comment) and control lookups go through the SAME function, so a pause written with a
+        # report code hits the EA's entries; control phases are keyed like the server's by_phase keys
+        cfc = self._body("string ZGB_CodeForComment(const string cmt)")
+        self.assertIn("return(ZGB_MethodCode(s));", cfc)
+        self.assertIn('StringFind(s, "[")', cfc)                 # broker suffix cut
+        self.assertIn("StringSubstr(s, 0, 31)", cfc)            # MT5 order comment limit
+        code = strip_code(self.mqh)
+        calls = [m.start() for m in re.finditer(r"\bZGB_MethodCode\(", code)]
+        start = code.index("string ZGB_CodeForComment(")
+        end = code.index("string ZGB_PhaseKey(")
+        outside = [c for c in calls if not start <= c < end and not code.startswith("string ZGB_MethodCode(", c - 7)]
+        self.assertEqual(outside, [])                            # nobody hashes a name outside ZGB_CodeForComment
+        self.assertIn("ps[n].mcode = ZGB_CodeForComment(cmt);", self.mqh)
+        directive = self._body("int ZGB_CtlDirective(")
+        self.assertIn("ZGB_CtlFind(ZGB_CodeForComment(method_name))", directive)
+        self.assertIn("ZGB_PhaseKey(phase_label)", directive)
+        pk = self._body("string ZGB_PhaseKey(const string phase)")
+        self.assertIn("< 24", pk)
+        self.assertIn('"none"', pk)
+
+    def test_phase_key_matches_server(self):
+        # emulate ZGB_PhaseKey and compare with agg._phase_key on the EA labels and odd input
+        import agg
+
+        def phase_key(p: str) -> str:
+            o = "".join(ch for ch in p if ch.isascii() and (ch.isalnum() or ch in "_-"))[:24]
+            return o or "none"
+        for label in ("SD|PB|N", "WU|IMP|H", "R|CTR|L", "", "|||", "A" * 40, "x y,z"):
+            self.assertEqual(phase_key(label), agg._phase_key(label), label)
 
     def test_aggregate_payload_has_no_per_trade_fields(self):
         start = self.mqh.index("string ZGB_AggJson(")

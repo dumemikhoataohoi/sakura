@@ -22,6 +22,15 @@
 //|  plus a "heartbeat" report once per InpGhReportEveryMin slot    |
 //|  while the context is fresh and nothing else was sent (reporting|
 //|  only: the bridge still never trades).                          |
+//|  2.5: ZGB_SetShadowStats(json) -> data.shadow in aggregate      |
+//|  reports: counts / R of the EA's blocked signals traded         |
+//|  virtually (by reason, method code x reason, phase x reason; no |
+//|  prices, times or method names). Reporting only.                |
+//|  2.5 FIX: ZGB_CodeForComment(cmt) is the one comment -> M### path|
+//|  for reports (entry deal comment) AND control (the EA passes the |
+//|  order comment); control phases are keyed like the server       |
+//|  (ZGB_PhaseKey: "SD|PB|N" -> "SDPBN"). Before 2.5 a pause from   |
+//|  GitHub never matched the report codes.                         |
 //|  HARD LIMITS stay in the EA: multipliers are clamped to          |
 //|  InpGhMaxRiskMult (default 1.0 = never increase); the EA's max   |
 //|  risk per trade, daily/weekly loss stops and crisis layer are    |
@@ -66,9 +75,11 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.4"
+#define ZGB_VERSION "2.5"
 #define ZGB_HAS_MKTCTX                 // 2.4: ZGB_SetMarketCtx available (EA161 v1.31 tests this)
 #define ZGB_CTX_MAX 1800               // 2.4: max bytes of the mkt.ctx object
+#define ZGB_HAS_SHADOW                 // 2.5: ZGB_SetShadowStats available (EA161 v1.32 tests this)
+#define ZGB_SHADOW_MAX 8000            // 2.5: max bytes of the data.shadow object
 #define ZGB_CTL_CACHE   "zumi_gh_control.json"
 #define ZGB_CTL_STALE_S (72 * 3600)
 #define ZGB_CTL_MAX_TTL (7 * 86400)
@@ -171,6 +182,8 @@ long     g_zgbFlagSlot   = -1;      // 15-minute slot in which the first pending
 string   g_zgbCtx        = "";      // 2.4: last valid market-context object (mkt.ctx)
 datetime g_zgbCtxT       = 0;       // 2.4: GMT when it was set
 bool     g_zgbCtxWarned  = false;
+string   g_zgbShadow     = "";      // 2.5: last valid blocked-signal shadow statistics object (data.shadow)
+bool     g_zgbShadowWarned = false;
 long     g_zgbRptSlot    = -1;      // 2.4: report slot (InpGhReportEveryMin) of the last report built (heartbeat: at most one report per slot)
 string   g_zgbMapName[];            // method name -> code (local file only)
 string   g_zgbMapCode[];
@@ -646,6 +659,32 @@ string ZGB_MethodCode(const string method)
         }
      }
    return(code);
+  }
+
+// 2.5: the ONE comment -> code path. The aggregate report hashes the comment of each position's ENTRY deal, and the control
+// channel must hit the same code, so the EA passes the order comment of the entry it is about to send (EA161 v1.32), and both
+// sides call this function. A broker suffix ("[sl ...]", "[tp ...]": exit deals only, cut defensively) and anything past the
+// 31 characters MT5 keeps of an order comment are removed before ZGB_MethodCode (trim, "," -> " ", salted hash, local map).
+string ZGB_CodeForComment(const string cmt)
+  {
+   string s = cmt;
+   int b = StringFind(s, "[");
+   if(b >= 0) s = StringSubstr(s, 0, b);
+   if(StringLen(s) > 31) s = StringSubstr(s, 0, 31);
+   return(ZGB_MethodCode(s));
+  }
+
+// 2.5: phase label as the server keys it (sakura scripts/agg.py _phase_key: keep [A-Za-z0-9_-], max 24, empty -> "none"), so
+// control.json "phases" taken from the reports' by_phase keys match the EA's label (EA161 passes "SD|PB|N" -> "SDPBN").
+string ZGB_PhaseKey(const string phase)
+  {
+   string o = "";
+   for(int i = 0; i < StringLen(phase) && StringLen(o) < 24; i++)
+     {
+      ushort ch = StringGetCharacter(phase, i);
+      if((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-') o += ShortToString(ch);
+     }
+   return(StringLen(o) > 0 ? o : "none");
   }
 
 //--- NFP/CPI/FOMC times seen in latest.json are remembered locally for the news rule
@@ -1146,9 +1185,9 @@ int ZGB_CtlFind(const string code)
 int ZGB_CtlDirective(const string method_name, const string phase_label)
   {
    if(!ZGB_CtlActive()) return(-1);
-   int k = ZGB_CtlFind(ZGB_MethodCode(method_name));
+   int k = ZGB_CtlFind(ZGB_CodeForComment(method_name));   // 2.5: method_name = the entry's order comment (= report code)
    if(k < 0 || (long)TimeGMT() >= g_zgbCtlExp[k]) return(-1);
-   if(StringLen(g_zgbCtlPhases[k]) > 0 && StringFind(g_zgbCtlPhases[k], "," + phase_label + ",") < 0) return(-1);
+   if(StringLen(g_zgbCtlPhases[k]) > 0 && StringFind(g_zgbCtlPhases[k], "," + ZGB_PhaseKey(phase_label) + ",") < 0) return(-1);
    return(k);
   }
 
@@ -1265,6 +1304,34 @@ void ZGB_SetMarketCtx(const string json_obj)
 bool ZGB_CtxFresh(const long slot_len)
   {
    return(StringLen(g_zgbCtx) > 0 && (long)TimeGMT() - (long)g_zgbCtxT <= slot_len + 1800);
+  }
+
+// 2.5: blocked-signal shadow statistics for data.shadow (EA161 v1.32 calls it on each new M15 bar and after changes). Same rule as the
+// market context: one JSON object of at most ZGB_SHADOW_MAX bytes made of [A-Za-z0-9_:.,{}[]"-] (no spaces, no free text), otherwise the last
+// good block is kept. Aggregate mode only; the server (sakura scripts/agg.py) whitelists every key, code and range again.
+void ZGB_SetShadowStats(const string json_obj)
+  {
+   int n = StringLen(json_obj);
+   bool ok = (n >= 2 && n <= ZGB_SHADOW_MAX && StringGetCharacter(json_obj, 0) == '{' && StringGetCharacter(json_obj, n - 1) == '}');
+   int depth = 0, quotes = 0;
+   for(int i = 0; ok && i < n; i++)
+     {
+      ushort ch = StringGetCharacter(json_obj, i);
+      bool alnum = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+      if(!alnum && ch != '_' && ch != ':' && ch != '.' && ch != ',' && ch != '-' && ch != '"' &&
+         ch != '{' && ch != '}' && ch != '[' && ch != ']') ok = false;
+      if(ch == '"') quotes++;
+      if(ch == '{' || ch == '[') depth++;
+      if(ch == '}' || ch == ']') { depth--; if(depth < 0) ok = false; }
+     }
+   if(ok && (depth != 0 || quotes % 2 != 0)) ok = false;
+   if(!ok)
+     {
+      if(!g_zgbShadowWarned) PrintFormat("ZumiGitHubBridge: shadow statistics rejected (%d chars), keeping the previous ones", n);
+      g_zgbShadowWarned = true;
+      return;
+     }
+   g_zgbShadow = json_obj;
   }
 
 void ZGB_Log(const string line)   // phase / analysis log line, sent with the next report
@@ -1784,7 +1851,7 @@ int ZGB_LoadPositions(const datetime from, ZgbPos &ps[])
       ps[n].r = r;
       ps[n].has_r = (risk > 0);
       ps[n].pl = pl;
-      ps[n].mcode = ZGB_MethodCode(cmt);
+      ps[n].mcode = ZGB_CodeForComment(cmt);   // entry deal comment (2.5: same path as the control channel)
       ps[n].no_sl = (sl <= 0);
       double loss = 0;
       ps[n].risk_over = (sl > 0 && last_base > 0 &&
@@ -1977,20 +2044,25 @@ bool ZGB_BuildAggReport(const string reason, const long round_sec)
    if(round_sec > 0) ts -= ts % round_sec;
    string rid = g_zgbAcct + "-" + IntegerToString(ts);
    string mkt = ZGB_MarketJson(false);
+   string shd = (StringLen(g_zgbShadow) > 0) ? ",\"shadow\":" + g_zgbShadow : "";   // 2.5
+   string pds = StringFormat("{\"day\":%s,\"week\":%s,\"mtd\":%s,\"r30\":%s}",
+                             ZGB_AggJson(ps, day0, false), ZGB_AggJson(ps, week0, false), ZGB_AggJson(ps, month0, true),
+                             ZGB_AggJson(ps, r30, false));
+   string eqj = ZGB_EquityJson(false), flg = ZGB_FlagsJson();
+   bool with_ctx = (StringLen(g_zgbCtx) > 0);
    string data = "", body = "";
-   for(int pass = 0; pass < 2; pass++)   // 2.4: a body over InpGhMaxPayloadBytes is rebuilt once without mkt.ctx
+   for(int pass = 0; pass < 3; pass++)   // a body over InpGhMaxPayloadBytes is rebuilt without mkt.ctx (2.4), then also without shadow (2.5)
      {
       data = StringFormat("{\"ea\":\"Zumi\",\"ver\":\"%s\",\"reason\":\"%s\",\"day\":\"%s\",\"phase\":\"%s\","
-                          "\"eq\":%s,\"mkt\":%s,\"periods\":{\"day\":%s,\"week\":%s,\"mtd\":%s,\"r30\":%s},\"flags\":%s}",
+                          "\"eq\":%s,\"mkt\":%s,\"periods\":%s,\"flags\":%s%s}",
                           ZGB_VERSION, ZGB_Esc(reason), ZGB_IsoDate(now_srv), ZGB_Esc(g_zgbPhase),
-                          ZGB_EquityJson(false), mkt,
-                          ZGB_AggJson(ps, day0, false), ZGB_AggJson(ps, week0, false), ZGB_AggJson(ps, month0, true),
-                          ZGB_AggJson(ps, r30, false),
-                          ZGB_FlagsJson());
+                          eqj, mkt, pds, flg, shd);
       body = StringFormat("{\"event_type\":\"ea_report\",\"client_payload\":{\"v\":2,\"kind\":\"ea_agg\",\"acct\":\"%s\","
                           "\"rid\":\"%s\",\"part\":1,\"parts\":1,\"ts\":%I64d,\"data\":%s}}", g_zgbAcct, rid, ts, data);
-      if(ZGB_Utf8Len(body) <= (int)MathMax(4000, InpGhMaxPayloadBytes) || StringLen(g_zgbCtx) == 0) break;
-      mkt = ZGB_MarketJson(false, false);
+      if(ZGB_Utf8Len(body) <= (int)MathMax(4000, InpGhMaxPayloadBytes)) break;
+      if(with_ctx) { with_ctx = false; mkt = ZGB_MarketJson(false, false); }
+      else if(StringLen(shd) > 0) shd = "";
+      else break;
      }
    if(!ZGB_Enqueue(body, ts, 1)) { Print("ZumiGitHubBridge: could not write the report queue file"); return(false); }
    ArrayResize(g_zgbFlagJson, 0);

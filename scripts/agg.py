@@ -53,6 +53,104 @@ CTX_ATR_MAX = 50.0                                                # |distance| i
 CTX_SCN = {"a": ("p", "to_atr"), "b": ("p", "pb_atr", "to_atr"), "c": ("p", "to_atr", "ext_atr")}
 
 
+# ---- data.shadow (bridge 2.5 / EA161 v1.32): blocked signals traded virtually at 1R (counts and R only, no prices / times / names)
+SHADOW_REASONS = ("CELL", "CTRL", "NEWS", "CRISIS", "CAP", "SPREAD", "BREAKER", "OTHER")
+SHADOW_PERIODS = ("day", "week", "mtd", "r30")
+_SHADOW_RS = "|".join(SHADOW_REASONS)
+SHADOW_METHOD_RE = re.compile(rf"^M\d{{3}}:(?:{_SHADOW_RS})$")
+SHADOW_PHASE_RE = re.compile(rf"^(?:[A-Z]{{2,8}}|none):(?:{_SHADOW_RS})$")
+SHADOW_METHOD_MAX = 30                                            # the EA sends the top 30 method code x reason cells
+SHADOW_PHASE_MAX = 40
+SHADOW_N_MAX = 1_000_000
+SHADOW_R_PER_TRADE = 2.5                                          # |R| of one virtual trade: SL -1, TP <= 2R (EA135 mode 2)
+
+
+def _shadow_row(v, path: str, stripped: set, full: bool) -> dict | None:
+    """{"n", "wins"[, "losses", "to"], "net_r"} with wins + losses <= n and |net_r| <= 2.5 R x n; None when invalid."""
+    if not isinstance(v, dict):
+        return None
+    keys = ("n", "wins", "losses", "to", "net_r") if full else ("n", "wins", "net_r")
+    for k in v:
+        if k not in keys:
+            _note(stripped, path, k)
+    n = _int_in(v.get("n"), 1, SHADOW_N_MAX)
+    if n is None:
+        return None
+    out = {"n": n}
+    for k in keys[1:-1]:
+        c = _int_in(v.get(k, 0), 0, n)
+        if c is None:
+            _note(stripped, path, k)
+            return None
+        out[k] = c
+    if out["wins"] + out.get("losses", 0) > n:
+        return None
+    r = _float_in(v.get("net_r", 0.0), -SHADOW_R_PER_TRADE * n - 0.01, SHADOW_R_PER_TRADE * n + 0.01, 3)
+    if r is None:
+        _note(stripped, path, "net_r")
+        return None
+    out["net_r"] = r
+    return out
+
+
+def _shadow_cells(v, path: str, stripped: set, key_re, cap: int) -> dict:
+    out: dict = {}
+    if not isinstance(v, dict):
+        _note(stripped, path.rsplit(".", 1)[0], path.rsplit(".", 1)[1])
+        return out
+    for k, row in list(v.items())[:1000]:
+        if not isinstance(k, str) or not key_re.match(k):
+            stripped.add(f"{path}.<invalid>")                       # the key could be a method name: never logged
+            continue
+        clean = _shadow_row(row, f"{path}.<cell>", stripped, False)
+        if clean is None:
+            stripped.add(f"{path}.<invalid>")
+        else:
+            out[k] = clean
+    if len(out) > cap:
+        stripped.add(f"{path}.<truncated>")
+        out = dict(sorted(out.items(), key=lambda kv: (-kv[1]["n"], kv[0]))[:cap])
+    return out
+
+
+def sanitize_shadow(obj, stripped: set, path: str = "data.shadow") -> dict | None:
+    """Whitelist validator for the EA blocked-signal shadow statistics. Returns None when nothing valid is left."""
+    if not isinstance(obj, dict):
+        _note(stripped, "data", "shadow")
+        return None
+    out: dict = {}
+    for k, v in obj.items():
+        val = None
+        if k == "v":
+            val = _int_in(v, 1, 9)
+        elif k == "open":
+            val = _int_in(v, 0, 100_000)
+        elif k == "periods" and isinstance(v, dict):
+            per: dict = {}
+            for pk, pv in v.items():
+                if pk not in SHADOW_PERIODS or not isinstance(pv, dict):
+                    _note(stripped, f"{path}.periods", pk)
+                    continue
+                rows = {}
+                for rk, rv in pv.items():
+                    clean = _shadow_row(rv, f"{path}.periods.{pk}.{rk}", stripped, True) if rk in SHADOW_REASONS else None
+                    if clean is None:
+                        _note(stripped, f"{path}.periods.{pk}", rk)
+                    else:
+                        rows[rk] = clean
+                per[pk] = rows
+            val = per
+        elif k == "by_method":
+            val = _shadow_cells(v, f"{path}.by_method", stripped, SHADOW_METHOD_RE, SHADOW_METHOD_MAX)
+        elif k == "by_phase":
+            val = _shadow_cells(v, f"{path}.by_phase", stripped, SHADOW_PHASE_RE, SHADOW_PHASE_MAX)
+        if val is None:
+            _note(stripped, path, k)
+        else:
+            out[k] = val
+    return out if "periods" in out else None
+
+
 class AggError(ValueError):
     pass
 
@@ -363,6 +461,10 @@ def sanitize_v2(payload: dict, rcfg: dict, now: dt.datetime, acct: str) -> tuple
                         out["periods"][pk] = block
                 else:
                     _note(stripped, "data.periods", pk)
+        elif k == "shadow":
+            shadow = sanitize_shadow(v, stripped)
+            if shadow:
+                out["shadow"] = shadow
         elif k == "flags" and isinstance(v, list):
             for item in v[: int(rcfg.get("max_flags", 50))]:
                 if isinstance(item, dict) and item.get("key"):
