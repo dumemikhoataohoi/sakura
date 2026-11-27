@@ -21,6 +21,7 @@ Cập nhật lần cuối: 2026-11-27.
 | A10 | Số lệnh mở rộng **theo đo lường**: 550/tháng hiện tại → ~1000–1500 ứng viên → 3000–5000, chỉ khi lớp lọc chứng minh còn lợi thế | 🟡 |
 | A11 | **Mục tiêu tối thiểu kế tiếp (v1.38)**: trên 23 tháng ngoài mẫu (2025-01..2026-11) tỉ lệ thắng **≥65%** ở 1R và **80–90 lệnh/tháng**, có lãi sau phí, rủi ro không tệ hơn v1.37 | ❌ Hiện v1.37: 56,8%, ~30 lệnh/tháng |
 | A12 | **Hướng tới ≥100 lệnh/tháng** (yêu cầu 2026-11-27) sau điều phối, vẫn giữ: không hedge, rủi ro ≤1%/lệnh, có lãi sau phí, chỉ số rủi ro không tệ hơn bản đang chạy. Mốc hiện tại: v1.40 ~25 lệnh/tháng; biên mô phỏng khi cấm hedge tối đa ~51 lệnh/tháng (v1.39) → cần họ phương pháp giữ lệnh ngắn, cùng chiều khung định hướng | ❌ |
+| A13 | **Cổng dựng bản mới (2026-11-27):** tiếp tục ở dạng MÔ PHỎNG; chỉ dựng EA khi bản mới **tốt hơn v1.40 nhiều** VÀ đạt **≥100 lệnh/tháng**, các yếu tố khác (lãi, tỉ lệ thắng, sụt giảm, chuỗi thua, ngày lỗ nặng nhất, tháng lỗ, ngày có lệnh, ngày có lãi) không kém v1.40 | 🟡 v1.43 đang nghiên cứu (giảm thời gian giữ lệnh, đảo chiều, vào lại, mở rộng S4) |
 | A8 | Được giữ lệnh qua cuối tuần và quá 1440 phút | ✅ |
 
 ## B. Phân tích thị trường (EA và Claude)
