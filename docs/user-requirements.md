@@ -66,6 +66,7 @@ Cập nhật lần cuối: 2026-11-27.
 | D3 | Tên file có số phiên bản (vd. `_v130_`) để không ghi đè bản cũ | ✅ |
 | D4 | Không thấy báo cáo "không đạt" mà dừng: phải nghiên cứu thêm phương pháp cho đến khi đạt | ✅ Nguyên tắc làm việc |
 | D5 | Kiểm tra trước khi gửi: đối chiếu với mô hình, kiểm tra tĩnh, soát độc lập, số input ≤ 1024, chuỗi input ≤ 255 ký tự, biên dịch 0 lỗi và 0 cảnh báo | ✅ |
+| D6 | **Mọi nghiên cứu và nâng cấp EA phải theo đúng `docs/research-protocol.md`** (đọc lại 4 ngày gần nhất, đối chứng, walk-forward 12 tháng→1 tháng, kiểm tra cuối, bảng trạng thái × phương pháp, đo riêng từng tầng, báo cáo bảng §9). Làm thật chặt từ nay trở đi | ✅ Áp dụng từ 27/11 |
 
 ## E. Demo → tiền thật
 
