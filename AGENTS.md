@@ -8,6 +8,9 @@ Read first: `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every
 
 ## Daily analysis routine (Claude)
 
+0. Read `docs/user-requirements.md` (binding user requirements + checklist) and check every item; report any item
+   that is not ✅. Then analyse the market first (multi-timeframe trend, reversal patterns/signals, S/R, news) from
+   the EA's `mkt` / `mkt.ctx` report block before any control decision.
 1. `data/quality.json`: is `ok` true? Any `stale` warnings?
 2. `data/latest.json`: VIX level/change, real yield (`DFII10`), USD (`DTWEXBGS`), `flags`, `events.next` (news in the
    next sessions). Values are as of D-1 or older; check `age`.
