@@ -50,6 +50,7 @@ Cập nhật lần cuối: 2026-11-27.
 | C6 | Mỗi ngày tìm hướng cải thiện (nhật ký cải tiến) để cuối tuần nâng cấp tốt hơn | ✅ Từ 27/11 |
 | C7 | Báo cáo bằng tiếng Việt sau mỗi lần điều phối: phân tích thị trường, lệnh, thay đổi và lý do, kế hoạch; hỏi người dùng | ✅ |
 | C8 | Không mở hoặc đóng lệnh từ xa; không đổi SL/TP; không nới giới hạn cứng (giới hạn an toàn) | ✅ |
+| C9 | **Claude toàn quyền loại bỏ cái không tốt** (phương pháp, bộ lọc, tính năng) khi số liệu chứng minh: chạy thật đủ mẫu thua rõ so với mô hình, kiểm tra chéo không có lợi thế, hoặc lệnh ảo cho thấy bộ lọc chặn nhầm lệnh tốt. Báo người dùng sau khi làm | ✅ Đã bỏ: khóa lãi trong ngày; 2 lớp bảo vệ v1.31 (không có lợi thế) gỡ khỏi v1.32 |
 
 ## D. Nâng cấp EA
 
