@@ -45,14 +45,15 @@ class GoldContextTest(unittest.TestCase):
     def test_candle_codes_and_context(self):
         import gold
         self.assertEqual(gold.candle_code(("d", 10, 12, 9, 11), ("d", 11, 13, 10.6, 11.1)), "SWEEP_HI")
-        self.assertEqual(gold.candle_code(("d", 11, 12, 10, 10.2), ("d", 10.1, 12.5, 9.9, 12.4)), "OUTSIDE")
+        self.assertEqual(gold.candle_code(("d", 11, 12, 10, 10.2), ("d", 10.1, 12.5, 9.9, 12.4)), "ENGULF_BULL")
+        self.assertEqual(gold.candle_code(("d", 10, 11, 9.5, 10.8), ("d", 10.2, 11.5, 9.0, 11.0)), "OUTSIDE")
         bars, p = [], 100.0
-        start = dt.date(2026, 6, 1)
-        for i in range(150):
+        start = dt.date(2025, 6, 1)
+        for i in range(460):
             o, c = p, p + 0.5
             bars.append(((start + dt.timedelta(days=i)).isoformat(), o, c + 0.3, o - 0.3, c))
             p = c
-        ctx = gold.context(bars, start + dt.timedelta(days=150))
+        ctx = gold.context(bars, start + dt.timedelta(days=460))
         self.assertEqual(ctx["d1"]["dir"], 1)
         self.assertGreater(ctx["d1"]["rsi"], 70)
         self.assertIn("w1", ctx)
