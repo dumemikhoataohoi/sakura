@@ -6,6 +6,7 @@ agents_status -> alerts (evaluate + render). Every output must be identical once
 latest.json must stay plaintext in phase 1 (the live EA runs bridge 2.3).
 """
 import contextlib
+import datetime as dt
 import io
 import json
 import os
@@ -27,7 +28,11 @@ import vault
 from zumi_common import iso_z, parse_utc
 
 KEY_HEX = "5a" * 32                       # dummy test key
-NOW = parse_utc("2026-11-27T14:00:00Z")   # after control.json's updated_utc, before its expiry
+# One hour after the live control.json's updated_utc (always before its expiry), so the test
+# does not break each time the coordination run refreshes the file.
+_CTRL = REPO / "control" / "control.json"
+NOW = (parse_utc(json.loads(_CTRL.read_text(encoding="utf-8"))["updated_utc"]) + dt.timedelta(hours=1)
+       if _CTRL.exists() else parse_utc("2026-11-27T14:00:00Z"))
 OUTPUT_DIRS = ("reports", "data", "control", "docs")
 
 

@@ -1,8 +1,8 @@
 {
   "author": "claude",
   "global": {
-    "expires_unix": 1795906800,
-    "expires_utc": "2026-11-28T23:00:00Z",
+    "expires_unix": 1796079600,
+    "expires_utc": "2026-11-30T23:00:00Z",
     "open_risk_pct": 6.0,
     "pause_all": false,
     "reason_code": "R05",
@@ -22,17 +22,17 @@
   },
   "news_blocks": [
     {
-      "end_unix": 1795816800,
-      "end_utc": "2026-11-27T22:00:00Z",
+      "end_unix": 1795995900,
+      "end_utc": "2026-11-29T23:45:00Z",
       "kind": "block",
       "reason_code": "R04",
-      "start_unix": 1795804200,
-      "start_utc": "2026-11-27T18:30:00Z"
+      "start_unix": 1795993200,
+      "start_utc": "2026-11-29T23:00:00Z"
     }
   ],
-  "notes_vi": "Th\u1ee9 S\u00e1u sau l\u1ec5 T\u1ea1 \u01a1n: thanh kho\u1ea3n m\u1ecfng, M\u1ef9 \u0111\u00f3ng c\u1eeda s\u1edbm; ch\u1eb7n v\u00e0o l\u1ec7nh m\u1edbi cu\u1ed1i phi\u00ean M\u1ef9.",
-  "seq": 4,
-  "updated_unix": 1795783768,
-  "updated_utc": "2026-11-27T12:49:28Z",
+  "notes_vi": "Cu\u1ed1i tu\u1ea7n, th\u1ecb tr\u01b0\u1eddng \u0111\u00f3ng: gi\u1eef r\u1ee7i ro m\u1ed9t n\u1eeda t\u1edbi h\u1ebft th\u1ee9 Hai; ch\u1eb7n 45 ph\u00fat \u0111\u1ea7u m\u1edf c\u1eeda tu\u1ea7n v\u00ec spread r\u1ed9ng.",
+  "seq": 5,
+  "updated_unix": 1795823496,
+  "updated_utc": "2026-11-27T23:51:36Z",
   "v": 1
 }
