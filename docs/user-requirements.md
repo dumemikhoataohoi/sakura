@@ -89,6 +89,8 @@ Cập nhật lần cuối: 2026-11-27.
 | E3 | Đạt thì vào tiền thật bằng tài khoản nhỏ, rủi ro 0,25–0,5% mỗi lệnh | ❌ Chờ 12/12 |
 | E4 | **Cực quan trọng (2026-11-27): hệ đa agent.** EA là một AI agent, GitHub là một AI agent, Claude là một AI agent; mỗi agent có nhiều agent con, điều phối lẫn nhau với mục tiêu chung: **mỗi ngày đều có lệnh và có lãi**. Thiết kế: `docs/agents.md` | 🟡 thiết kế xong; đang làm agent điều phối v2 / C2 |
 | E5 | **Các agent vận hành như một công ty** (2026-11-27): giao dịch = khai thác dòng tiền; mỗi agent và agent con là một phòng ban có **KPI riêng**, đo theo ngày/tuần, so với kỳ trước, để ngày càng tốt hơn và kiếm được nhiều hơn. Bảng KPI: `docs/agents.md` mục 6 | 🟡 bảng KPI xong; đo tự động đang làm |
+| E6 | **Chức vụ như công ty thực thụ, KPI tăng trưởng mỗi ngày** (2026-11-27): sơ đồ chức vụ CEO/CRO/COO/CFO/CTO…; mục tiêu KPI tự nâng khi đạt liên tục, không hạ sàn; KPI rủi ro chỉ giữ hoặc siết. `docs/agents.md` 6.1–6.2 | 🟡 tài liệu xong; nâng mục tiêu tự động đang làm |
+| A16 | **Thêm phương pháp tốt hơn nếu có** (2026-11-27), mục tiêu trên 100 lệnh/tháng | 🟡 tìm nguồn ngoài vòng 2 + v1.50 |
 
 ## F. Cách làm việc
 

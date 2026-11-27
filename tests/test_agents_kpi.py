@@ -75,7 +75,7 @@ class KpiTest(unittest.TestCase):
         # every department of the section 6 table has KPI rows (measured or SKIP with a reason)
         self.assertEqual(len({d for _, d, _, _, _ in ast.KPI_DEFS}), 11)
         doc = (REPO / "docs" / "agents.md").read_text(encoding="utf-8")
-        table = doc[doc.index("## 6."):doc.index("## 7.")]
+        table = doc[doc.index("## 6."):doc.index("### 6.1")]
         self.assertEqual(table.count("\n| **"), 11)
 
     def test_company_block_values_status_and_trend(self):

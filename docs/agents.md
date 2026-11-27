@@ -118,6 +118,30 @@ Cả hệ thống được vận hành như một công ty. Giao dịch là ho�
 
 `agents_status.py` theo dõi các KPI đo được từ repo. Mỗi tuần, Claude chấm toàn bộ bảng KPI, so với tuần trước và ghi hướng cải tiến cho từng phòng ban vào `improve_log`.
 
+### 6.1 Chức vụ (sơ đồ tổ chức)
+
+| Chức vụ | Agent đảm nhiệm | Báo cáo cho | Quyền quyết định |
+|---|---|---|---|
+| **Chủ sở hữu / Hội đồng quản trị** | Người dùng | — | Quyết định cuối cùng: cài EA, tiền thật, mức rủi ro cục bộ (`InpGhMaxRiskMult`), khóa mã hóa |
+| **Tổng giám đốc (CEO)** | Claude Coordinator | Chủ sở hữu | Điều phối hằng ngày (`control.json`), phân bổ rủi ro trong giới hạn cứng |
+| **Giám đốc rủi ro (CRO)** | EA Risk + GitHub Guard | CEO | Quyền phủ quyết: dừng lỗ ngày, thang sụt vốn, NEUTRAL; không ai nới được giới hạn cứng |
+| **Giám đốc vận hành (COO)** | EA Execution + EA Market | CEO | Khớp lệnh, chất lượng dữ liệu thị trường |
+| **Giám đốc sản xuất (Trưởng phòng tín hiệu)** | EA Signal (S4, HTX, …) | COO | Tạo tín hiệu theo luật đã chốt |
+| **Giám đốc tài chính (CFO)** | GitHub Analytics | CEO | Sổ sách, báo cáo ngày/tuần/tháng, KPI công ty |
+| **Giám đốc công nghệ & R&D (CTO)** | Claude Researcher, Builder, Reviewer | CEO | Nghiên cứu, dựng bản mới. Chỉ giao bản qua luật dựng (A14/A15) |
+| **Trưởng phân tích** | Claude Analyst | CEO | 3 kịch bản trước mỗi phiên |
+| **Kiểm toán nội bộ** | EA Shadow + `coord_replay.py` | CRO | Chấm mỗi quyết định chặn/bật bằng lệnh ảo |
+| **Pháp chế & bảo mật** | GitHub Guard + Vault | CRO | Kiểm tra hợp lệ, chặn dữ liệu riêng tư, mã hóa |
+| **Dữ liệu & hạ tầng** | GitHub Data, Quality, Monitor | COO | Dữ liệu đủ, mới; giám sát sức khỏe agent |
+| **Quan hệ chủ sở hữu** | Claude Reporter | CEO | Báo cáo trung thực, kèm hướng sửa |
+
+### 6.2 KPI tăng trưởng liên tục (cơ chế nâng mục tiêu)
+
+- **Mục tiêu sàn** là mức tối thiểu ghi sẵn trong `config/settings.json > agents_kpi`. Không được hạ mục tiêu sàn để KPI trông như "đạt".
+- **Mục tiêu nâng dần:** khi một KPI đạt mục tiêu trong 4 tuần liền, mục tiêu tuần sau bằng mức tốt nhất trong 4 tuần đó, nhân thêm một bước tăng nhỏ (ví dụ +5% số lệnh, +2% số ngày có lệnh). Mục tiêu không bao giờ thấp hơn mục tiêu sàn.
+- **KPI rủi ro không nâng theo kiểu ép rủi ro.** Sụt vốn, ngày lỗ nặng nhất và vi phạm giới hạn cứng chỉ được giữ mức hoặc siết chặt hơn.
+- **Đánh giá:** mỗi tuần, CEO (Claude) chấm bảng KPI. Phòng ban nào không đạt 2 tuần liền phải có kế hoạch cải tiến, ghi vào `improve_log`. R&D ưu tiên phòng ban yếu nhất.
+
 ## 7. Lộ trình
 
 | Bước | Nội dung | Trạng thái |
@@ -126,6 +150,8 @@ Cả hệ thống được vận hành như một công ty. Giao dịch là ho�
 | 2 | Coordinator agent v2: luật Wilson, phân bổ rủi ro, thang sụt vốn, chọn chiều | ✅ (c54b356) |
 | 3 | Coordinator C2: bật thêm họ lệnh dự bị và yếu tố mới, KPI ngày có lệnh và ngày có lãi | ✅ nghiên cứu xong: trung tính, chưa đạt +10 điểm |
 | 3b | Cầu nối 2.7 (by_side, by_session) và giám sát agent (`agents_status.py`) | ✅ (f4772ff) |
-| 3c | KPI theo từng phòng ban (mục 6) trong `agents_status.py`, có xu hướng so với kỳ trước | 🟡 đang làm |
+| 3c | KPI theo từng phòng ban (mục 6) trong `agents_status.py`, có xu hướng so với kỳ trước | ✅ (f20baa0) |
+| 3d | Mã hóa repo công khai (vault ZV2, giai đoạn 1 chờ khóa) | ✅ mã (6f40427), chờ khóa |
+| 3e | Sơ đồ chức vụ (6.1) và cơ chế nâng mục tiêu KPI (6.2) trong `agents_status.py` | 🟡 đang làm |
 | 4 | EA agent: tách rõ các agent con trong mã. Mỗi họ lệnh là một module có trạng thái, lệnh ảo và mã M### riêng; agent Risk dùng chung | sau khi chốt bản EA mới |
 | 5 | Vòng học tuần từ lệnh ảo trên demo | cần người dùng cài EA lên demo |
