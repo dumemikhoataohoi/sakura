@@ -26,3 +26,14 @@
 | 2026-11-27 | github.com/apurv-wicko/gold-strategy-tests | mã | 16 setup phổ biến trên M1 2021–26, có phí: hầu hết âm. Nguyên nhân chính là phí so với khoảng SL; lọc SL ≥ 10% ADR14 cứu được phần lớn | v1.45 H1: nhận cho S4 ngày tin và TD H1/H2; loại cho T5/T15/LOR/AFD/PDS/NYC/TPB |
 | 2026-11-27 | EA vàng trên GitHub (xauusd-trend-follow, HydraPrime, FvgGold-EA, BAKOMEGoldScalper, GoldTraderEA) | mã | Tối ưu trong mẫu, không có kiểm định ngoài mẫu, không đáng tin | không dùng |
 | 2026-11-27 | r/algotrading; blog YuRa Trading | cộng đồng | Breakout và mua dip vàng thường sụp khi tính phí. Ý tưởng lặp lại: phiên Á, lọc spread/ATR | giả thuyết |
+| 2026-11-27 | Telonics; Delta Terminal (nghiên cứu sweep thanh khoản) | chiến lược | Sweep không đảo chiều. Phá đỉnh/đáy tuần trước rồi đi tiếp 1 ATR: 61,9% so với 50,3% ở mức giả, trên 7 thị trường, giữ được ngoài mẫu 2025–26. Chưa tính phí | ứng viên PWB, khoảng 3–4 lệnh/tháng |
+| 2026-11-27 | Thinridge: fade đỉnh/đáy tuần trước, inside-bar, squeeze (GC) | chiến lược | Âm sau phí, 2008–26 | không dùng |
+| 2026-11-27 | ripbacktest.com (21 chiến lược vàng, TTM Squeeze) | chiến lược | Không bản nào qua cổng. Thêm SL/TP cố định làm hỏng các luật xu hướng | cảnh báo |
+| 2026-11-27 | github.com/Kidus-M/Quant; AaroNLaU0307/quant-trend-research; wickcheck Donchian D1 | mã | Donchian H4 có lọc phiên: walk-forward PF 1,42, nhưng chỉ ở phân vị 90 so với vào ngẫu nhiên. Lợi thế phụ thuộc trailing | ứng viên yếu |
+| 2026-11-27 | xauusdglobal NR7; pinescriptforge GC NR7 | chiến lược | NR7 D1: 71% ngày sau đóng ngoài biên, nhưng 25% phá cả hai phía. Không kiểm ngoài mẫu | ứng viên yếu |
+| 2026-11-27 | xauusdglobal weekly open | chiến lược | 53 lệnh trong 2 năm, PF 1,69 ở mục tiêu 2R. Năm 2025 âm | ứng viên yếu |
+| 2026-11-27 | Turn-of-month (guptagaurav, quantarenas, In Gold We Trust 2024, Kumar 2024) | chiến lược | Bằng chứng yếu, p=0,02 nhưng là một trong nhiều phép thử | yếu |
+| 2026-11-27 | Gap đầu tuần (forgestrategylab, quorailab, …) | chiến lược | Chỉ hơn mức gốc 3,6 điểm; 58% số gap nhỏ hơn spread | loại |
+| 2026-11-27 | Tỷ lệ vàng/bạc (GlobalARB, tickfloor, quantarenas) | chiến lược | Walk-forward ngoài mẫu −0,27%/năm | loại |
+| 2026-11-27 | Connors RSI(2)/IBS D1 trên GLD (bulltides, duckquant, setup4alpha, quantifiedstrategies) | chiến lược | Thua mua-giữ ở cả hai nửa mẫu | loại |
+| 2026-11-27 | tesseratrades BB breakout NY H1 | chiến lược | Mục tiêu 5R, thắng 24%, không chuyển sang 1R được | không dùng |
