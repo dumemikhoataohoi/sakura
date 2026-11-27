@@ -135,7 +135,7 @@
     "dd_alert_pct": 5.0
   },
   "coordinator": {
-    "_doc": "Pre-registered rules for scripts/coordinator_report.py. Claude reads the suggestion and decides.",
+    "_doc": "Pre-registered rules for scripts/coordinator_report.py (v2: R02 Wilson health switch, R02 reduce risk allocation, R05 drawdown ladder + open-risk cap, R09 side). Claude reads the suggestion and decides.",
     "report_max_age_h": 36,
     "directive_hours": 48,
     "streak_pause_n": 4,
@@ -157,6 +157,46 @@
     ],
     "news_lookahead_h": 72,
     "news_before_min": 30,
-    "news_after_min": 30
+    "news_after_min": 30,
+    "r02_mode": "wilson",
+    "health_window_days": 90,
+    "health_min_n": 20,
+    "health_z": 1.645,
+    "health_pause_ub_pct": 50.0,
+    "health_restore_lb_pct": 50.0,
+    "health_prior_n": 10,
+    "health_cell": "phase",
+    "alloc_enable": false,
+    "alloc_min_n": 10,
+    "alloc_prior_n": 10,
+    "alloc_slope": 1.5,
+    "alloc_min_mult": 0.25,
+    "alloc_step": 0.05,
+    "dd_ladder": [
+      [
+        3.0,
+        0.75
+      ],
+      [
+        5.0,
+        0.5
+      ]
+    ],
+    "dd_open_risk_ladder": [
+      [
+        3.0,
+        9.0
+      ],
+      [
+        5.0,
+        6.0
+      ]
+    ],
+    "open_risk_local_pct": 12.0,
+    "dd_crisis_pause_all": true,
+    "side_enable": true,
+    "side_window_days": 14,
+    "side_min_n": 30,
+    "side_ub_pct": 45.0
   }
 }

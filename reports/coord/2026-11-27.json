@@ -2,7 +2,7 @@
   "accounts": [
     "3238681b19703d89"
   ],
-  "as_of": "2026-11-27T12:00:00Z",
+  "as_of": "2026-11-27T15:00:00Z",
   "changes": [
     "global risk_mult 0.50->1.00 (R00)",
     "global open_risk_pct EA default (R00)"
@@ -12,8 +12,8 @@
   "proposal": {
     "author": "claude",
     "global": {
-      "expires_unix": 1795953600,
-      "expires_utc": "2026-11-29T12:00:00Z",
+      "expires_unix": 1795964400,
+      "expires_utc": "2026-11-29T15:00:00Z",
       "pause_all": false,
       "reason_code": "R00",
       "risk_mult": 1.0
@@ -42,8 +42,8 @@
     ],
     "notes_vi": "\u0110\u1ec1 xu\u1ea5t t\u1ef1 \u0111\u1ed9ng theo quy t\u1eafc \u0111\u0103ng k\u00fd tr\u01b0\u1edbc; Claude xem x\u00e9t v\u00e0 quy\u1ebft \u0111\u1ecbnh.",
     "seq": 5,
-    "updated_unix": 1795780800,
-    "updated_utc": "2026-11-27T12:00:00Z",
+    "updated_unix": 1795791600,
+    "updated_utc": "2026-11-27T15:00:00Z",
     "v": 1
   },
   "restored": []

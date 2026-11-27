@@ -192,6 +192,7 @@ Aggregate block (positions that are fully closed, counted at their last exit):
 | `by_method` | `{"M001": {n, wins, win_pct, net_r, cur_ls, l20_n, l20_wins}, ...}`: **method codes**, never names (see below); `cur_ls` = current losing streak of the group, `l20_*` = its last 20 trades |
 | `by_phase` | same per phase name |
 | `by_method_phase` | same per `"M###:PHASE"` (used by the coordinator rules) |
+| `by_side` | optional, keys `buy` / `sell` only (`{n, wins, net_r}`): coordinator rule R09. Any other key is dropped. EA161 <= v1.41 / bridge 2.6 do not send it yet (R09 then never fires) |
 | `grid` | `mtd` only: `{"Mon": {"08": {n, wins}}}` weekday x 4-hour UTC bucket of the entry; cells with `n < 3` carry the count only |
 | `n_ex`, `mae_r`, `mfe_r` | optional average worst / best excursion in R (positions tracked while open) |
 

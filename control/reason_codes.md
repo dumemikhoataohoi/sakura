@@ -7,14 +7,14 @@ prices). `scripts/control.py` rejects unknown codes. Mỗi chỉ thị trong `co
 |---|---|---|---|
 | R00 | neutral / no specific reason | trung tính, không có lý do riêng | global at 1.0 |
 | R01 | method losing streak | phương pháp đang thua liên tiếp | `pause` / `reduce` a method code |
-| R02 | phase mismatch / weak record in this phase | phương pháp không hợp phase hiện tại (thành tích yếu trong phase này) | `pause` / `reduce` with `phases` |
+| R02 | phase mismatch / weak record in this phase | phương pháp không hợp phase hiện tại (thành tích yếu trong phase này) | `pause` with `phases` (Wilson health switch), `reduce` (risk allocation) |
 | R03 | news event | sự kiện tin tức | news `block` window, or an `allow` window |
 | R04 | volatility shock | biến động bất thường (VIX, vàng > k x ATR) | global `risk_mult` < 1 or `pause_all` |
-| R05 | drawdown guard | bảo vệ khi drawdown | global `risk_mult` < 1 |
+| R05 | drawdown guard | bảo vệ khi drawdown | global `risk_mult` < 1 (ladder), `open_risk_pct`, `pause_all` only with an EA crisis block |
 | R06 | data quality | dữ liệu có vấn đề | neutral or reduced risk |
 | R07 | opportunity / strong phase fit | cơ hội / phương pháp rất hợp phase hiện tại | `boost` (within the EA cap) or `on`, or an `allow` window |
 | R08 | method re-enable after recovery | bật lại phương pháp sau khi đã hồi phục | `on` (lifts an earlier pause, or enables an off-by-default method) |
-| R09 | direction bias from multi-timeframe confluence | định hướng chiều lệnh theo đồng thuận đa khung | `global.side` buy / sell (restrict entries to one side) |
+| R09 | direction bias from multi-timeframe confluence | định hướng chiều lệnh theo đồng thuận đa khung | `global.side` buy / sell / auto (restrict entries to one side; auto = the EA CDS decides) |
 
 Rules (pre-registered, see `config/settings.json` > `coordinator` and `docs/control.md`):
 

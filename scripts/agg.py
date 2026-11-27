@@ -23,6 +23,7 @@ METHOD_RE = re.compile(r"^M\d{3}$")
 PHASE_RE = re.compile(r"[^A-Za-z0-9_-]")
 FLAG_KEY_RE = re.compile(r"[^a-z0-9_:.-]")
 RULES = ("no_sl", "risk_cap", "news", "daily_cap")
+AGG_SIDES = ("buy", "sell")   # by_side keys (coordinator R09); any other key is dropped
 
 AGG_INT = ("n", "wins", "losses", "be", "max_ls", "cur_ls", "lead_ls")
 AGG_FLOAT = ("win_pct", "net_r", "avg_r", "gross_win_r", "gross_loss_r", "pf", "net_pct", "dd_pct",
@@ -404,6 +405,14 @@ def sanitize_agg_block(obj, path: str, stripped: set) -> dict | None:
             val = _groups(v, f"{path}.by_phase", stripped, _phase_key)
         elif k == "by_method_phase":
             val = _groups(v, f"{path}.by_method_phase", stripped, _method_phase_key)
+        elif k == "by_side":
+            sides = {}
+            for sk, sv in (v.items() if isinstance(v, dict) else []):
+                if str(sk).lower() in AGG_SIDES:
+                    sides[str(sk).lower()] = sv
+                else:
+                    stripped.add(f"{path}.by_side.<invalid>")   # never log the raw key
+            val = _groups(sides, f"{path}.by_side", stripped, lambda x: x)
         elif k == "grid":
             val = _grid(v, f"{path}.grid", stripped)
         else:
@@ -494,7 +503,7 @@ def sanitize_v2(payload: dict, rcfg: dict, now: dt.datetime, acct: str) -> tuple
 def empty_agg() -> dict:
     return {"n": 0, "wins": 0, "losses": 0, "be": 0, "net_r": 0.0, "gross_win_r": 0.0, "gross_loss_r": 0.0,
             "net_pct": 0.0, "max_ls": 0, "cur_ls": 0, "lead_ls": 0, "dd_pct": 0.0,
-            "rule": {}, "by_method": {}, "by_phase": {}, "grid": {}}
+            "rule": {}, "by_method": {}, "by_phase": {}, "by_side": {}, "grid": {}}
 
 
 def finish(a: dict) -> dict:
@@ -537,7 +546,7 @@ def merge_aggs(aggs: list[dict]) -> dict:
         path_dd = max(path_dd, peak - cum)
         for r, c in (a.get("rule") or {}).items():
             out["rule"][r] = out["rule"].get(r, 0) + c
-        for fld in ("by_method", "by_phase"):
+        for fld in ("by_method", "by_phase", "by_side"):
             for k, g in (a.get(fld) or {}).items():
                 out[fld][k] = _merge_group(out[fld][k], g) if k in out[fld] else dict(g)
         for wd, row in (a.get("grid") or {}).items():

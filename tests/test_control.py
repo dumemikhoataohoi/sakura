@@ -206,7 +206,7 @@ class CoordinatorTest(unittest.TestCase):
         g = lambda n, w, r, cur: {"n": n, "wins": w, "net_r": r, "cur_ls": cur, "l20_n": min(n, 20), "l20_wins": w}
         payload["data"]["periods"]["r30"] = {"n": 60, "wins": 30, "losses": 30, "be": 0, "by_method_phase": {
             "M001:TREND": g(8, 3, -2.0, 5),      # R01 streak
-            "M002:RANGE": g(12, 3, -4.0, 1),     # R02 weak win%
+            "M002:RANGE": g(24, 6, -12.0, 1),    # R02 Wilson: upper bound < 50 % with n >= 20
             "M003:TREND": g(18, 13, 9.0, 0),     # R07 boost
             "M005:TREND": g(10, 6, 2.0, 0),      # recovered -> R08
             "M000:none": g(5, 0, -5.0, 5)}}      # unknown code: never touched

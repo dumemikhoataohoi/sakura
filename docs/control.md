@@ -53,7 +53,7 @@ when `InpGhControlEnable=true`.
 | `mode` | `pause` (multiplier 0), `reduce` (0 <= x < 1), `on` (1.0; may enable an off-by-default method if the EA allows), `boost` (1 < x <= 2.0, within the EA cap) |
 | `phases` | optional list of phase labels where the directive applies (empty = every phase) |
 | `news_blocks` | `kind: "block"` (<= 24 h) adds blocking; `kind: "allow"` (<= 4 h, reason R03/R07) can lift the EA's own news veto for one event when `InpGhAllowNewsOverride` is true |
-| `reason_code` | one of `control/reason_codes.md` (R00..R08) |
+| `reason_code` | one of `control/reason_codes.md` (R00..R09) |
 | `notes_vi` | <= 300 chars, public: no prices (decimal numbers or 4+ digit numbers other than years are rejected) |
 
 Effective multiplier for a method in a phase: `global x method` (pause = 0, pause_all = 0), clamped to
@@ -69,23 +69,42 @@ Effective multiplier for a method in a phase: `global x method` (pause = 0, paus
    and comments on the alerts PR. The EA would treat an invalid file as NEUTRAL anyway.
 4. `python scripts/control.py effective` shows what the EA applies right now.
 
-## Coordinator (`scripts/coordinator_report.py`)
+## Coordinator (`scripts/coordinator_report.py`, v2)
 
 Writes `reports/coord/YYYY-MM-DD.md` (+ `.json`) with rule hits and a proposed `control.json`, from the newest aggregate
-report (rolling-30-day `by_method_phase` stats: count, wins, net R, current losing streak, last-20 trades), the drawdown,
-`data/latest.json` flags, `data/quality.json` and the calendar. Pre-registered thresholds (`config/settings.json` >
-`coordinator`):
+report (rolling-30-day `by_method_phase` stats: count, wins, net R, current losing streak, last-20 trades), the
+**history** (sum of the stored daily blocks of the last `health_window_days`, newest report per UTC day, aggregate data
+only), the drawdown, the EA crisis state (`mkt.ctx.cr`), blocked-signal counts (`shadow.by_method`), `data/latest.json`
+flags, `data/quality.json` and the calendar. The rule engine `decide()` is a pure function, also used by the offline
+replay `scripts/coord_replay.py`. Pre-registered thresholds (`config/settings.json` > `coordinator`; code defaults in
+`V2_DEFAULTS`):
 
 | rule | default | action |
 |---|---|---|
-| R01 streak | `streak_pause_n` 4 | pause the code in that phase |
-| R02 weak record | last-20 win% < `winrate_pause_pct` 35 with >= `winrate_min_trades` 10 | pause in that phase |
-| R07 strong record | last-20 n >= 15, win% >= 60, avg R >= 0.3, no current streak | boost x`boost_mult` 1.25 in that phase (effective only if the EA cap allows) |
-| R08 recovery | a paused code's last-20 win% >= `recover_winpct` 50, no streak | `on` (lift the pause) |
+| R01 streak | `streak_pause_n` 4 (rolling 30 days) | pause the code in that phase |
+| R02 health switch (`r02_mode` `wilson`) | cell = code x phase (`health_cell` `phase`; `band` = D1 band, `code` = all phases) over `health_window_days` 90 (falls back to r30); n >= `health_min_n` 20 and Wilson 90 % (`health_z` 1.645) upper bound < `health_pause_ub_pct` 50 % | pause in that phase. The report also shows the shrunk win% (`health_prior_n` 10 towards the account's pooled win%) |
+| R08 recovery | cell lower bound >= `health_restore_lb_pct` 50 %, or blocked signals `shadow M###:CTRL` with n >= 20 and lower bound >= 50 %; v1: last-20 win% >= `recover_winpct` 50, no streak | `on` (lift the pause) |
+| R02 last-20 (`r02_mode` `last20`, v1) | last-20 win% < `winrate_pause_pct` 35 with >= `winrate_min_trades` 10 | pause in that phase |
+| R02 risk allocation (`alloc_enable`, default **off**) | per code over the history window: n >= `alloc_min_n` 10, shrunk expectancy `e = net_r / (n + alloc_prior_n)` < 0 | `reduce` x`max(alloc_min_mult 0.25, 1 + alloc_slope 1.5 x e)` (step 0.05), never above 1.0 |
+| R07 strong record | last-20 n >= 15, win% >= 60, avg R >= 0.3, no current streak | boost x`boost_mult` 1.25 in that phase (effective only if the EA cap `InpGhMaxRiskMult` allows) |
 | R07 enable | codes listed in `enable_codes` (user pre-approved), when the EA's current phase is listed | `on` (needs `InpGhAllowEnable`) |
-| R05 drawdown | week or MTD drawdown >= `dd_reduce_pct` 5 % | global x`dd_reduce_mult` 0.5 |
+| R05 drawdown ladder | week or MTD drawdown >= 3 % / 5 % (`dd_ladder`; `null` = v1 single step `dd_reduce_pct` 5 -> `dd_reduce_mult` 0.5) | global x0.75 / x0.5 and `open_risk_pct` 9 / 6 (`dd_open_risk_ladder`, never above `open_risk_local_pct` 12; the EA applies `min(local, file)`). `pause_all` only at the top step **and** when the EA itself reports a crisis block (`mkt.ctx.cr` = `BLOCK...`, `dd_crisis_pause_all`) |
 | R04 volatility | VIX high flag and `vix_high_mult` < 1 (off by default) | global x`vix_high_mult` |
+| R09 side | one side's Wilson upper bound < `side_ub_pct` 45 % over n >= `side_min_n` 30 in the last `side_window_days` 14 (needs the optional `by_side` aggregate; EA161 <= v1.41 does not send it, so R09 stays inert) | `global.side` `auto` (the EA's own multi-TF CDS picks the side), otherwise `both` |
 | R03 news | NFP/CPI/FOMC within `news_lookahead_h` 72 h | block from `news_before_min` 30 before to `news_after_min` 30 after |
 
-Directives that no longer fire are kept until they expire, then dropped (the method returns to its EA default). Pause wins
-over boost for the same code. Nothing is applied without `--apply`; Claude reviews the suggestion and decides.
+Directives that no longer fire are kept until they expire, then dropped (the method returns to its EA default).
+Precedence per code: pause > boost > on > reduce; a kept (unexpired) pause is never lifted by a `reduce`. At most 10
+phases per directive (the worst cells first). Global reason: R05 when the ladder is active, else R04 / R09 / R00. Nothing
+is applied without `--apply`; Claude reviews the suggestion and decides.
+
+## Offline replay (`scripts/coord_replay.py`)
+
+`python scripts/coord_replay.py STREAM.csv [--periods D7,C41P,CLEAN] [--cost STD] [--cap 1.0] [--risk-pct 0.5]
+[--set key=JSON ...] [--reps 1000] [--json OUT.json]` replays `decide()` walk-forward on a research trade stream (a CSV
+kept **outside** this public repo: `t0, t1, code, phase, side, r_<COST>, size, risk_mult[, family, auto_ok]`; `X###`
+codes are treated as `M###`). Decisions at 00:00, 06:47 and 12:47 UTC see only trades closed before them, in the same
+aggregate form the EA reports (blocked signals only as shadow counts); the proposal governs the entries until the next
+decision. Output per period: win% (points and relative %), trades/month, net R, closed-equity DD, longest losing streak,
+losing trades, worst day, and a random control (same number of trades kept per month) with a one-sided p-value.
+Limitation: trades are filtered after the EA's own execution (a freed slot is not re-filled).
