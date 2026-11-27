@@ -56,6 +56,8 @@ class ValidatorTest(unittest.TestCase):
         self.assertEqual(norm["global"]["side"], "sell")
         self.assertEqual(control.effective(norm, NOW)["global"]["side"], "sell")
         self.bad(base(**{"global": {"side": "long", "reason_code": "R09"}}), "global.side")
+        norm, _ = self.ok(base(**{"global": {"side": "auto", "reason_code": "R09"}}))
+        self.assertEqual(norm["global"]["side"], "auto")
         self.bad(base(**{"global": {"side": "buy"}}), "reason")
 
     def test_defaults_and_expiry(self):

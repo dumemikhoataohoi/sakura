@@ -48,7 +48,7 @@ when `InpGhControlEnable=true`.
 | `global.risk_mult` | [0, 2.0] in the file; EA clamp to `InpGhMaxRiskMult`; a value other than 1.0 needs a reason code |
 | `global.pause_all` | pauses every method |
 | `global.open_risk_pct` | optional, [1, 20] % of balance: total open-risk cap. The EA applies `min(its local cap input, this)`, so the file can only tighten below, or relax back up to, the user's local cap, never above it. Omitted = the EA's local value. Needs a reason code. Ignored by EAs older than v1.30 |
-| `global.side` | optional `both` (default) / `buy` / `sell`: the EA opens new entries only on that side (restrict only; never opens, closes or modifies trades). Needs a reason code (R09). Ignored by EAs older than v1.33 |
+| `global.side` | optional `both` (default) / `buy` / `sell` / `auto`: the EA opens new entries only on that side (`auto` = the EA's own multi-timeframe confluence score picks the side every bar, flat when no confluence) (restrict only; never opens, closes or modifies trades). Needs a reason code (R09). Ignored by EAs older than v1.33 |
 | `methods` keys | method **codes** `M###` only (names stay in the user's local map file) |
 | `mode` | `pause` (multiplier 0), `reduce` (0 <= x < 1), `on` (1.0; may enable an off-by-default method if the EA allows), `boost` (1 < x <= 2.0, within the EA cap) |
 | `phases` | optional list of phase labels where the directive applies (empty = every phase) |

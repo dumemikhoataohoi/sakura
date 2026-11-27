@@ -63,7 +63,7 @@ PHASE_RE = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 PRICE_RE = re.compile(r"\d+[.,]\d+|\b(?!20\d\d\b)\d{4,}\b")
 TOP_KEYS = {"v", "author", "seq", "updated_utc", "updated_unix", "global", "methods", "news_blocks", "notes_vi"}
 GLOBAL_KEYS = {"risk_mult", "pause_all", "open_risk_pct", "side", "expires_utc", "expires_unix", "reason_code"}
-SIDES = ("both", "buy", "sell")   # global.side: which entry side the EA may open (restrict only)
+SIDES = ("both", "buy", "sell", "auto")   # global.side: entry side the EA may open (restrict only); auto = EA multi-TF confluence decides per bar
 OPEN_RISK_MIN, OPEN_RISK_MAX = 1.0, 20.0   # % of balance; the EA applies min(its local cap, this)
 METHOD_KEYS = {"mode", "risk_mult", "phases", "reason_code", "expires_utc", "expires_unix"}
 WINDOW_KEYS = {"kind", "start_utc", "start_unix", "end_utc", "end_unix", "reason_code"}
