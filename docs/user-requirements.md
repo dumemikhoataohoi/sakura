@@ -52,7 +52,7 @@ Cập nhật lần cuối: 2026-11-27.
 | C8 | Không mở hoặc đóng lệnh từ xa; không đổi SL/TP; không nới giới hạn cứng (giới hạn an toàn) | ✅ |
 | C9 | **Claude toàn quyền loại bỏ cái không tốt** (phương pháp, bộ lọc, tính năng) khi số liệu chứng minh: chạy thật đủ mẫu thua rõ so với mô hình, kiểm tra chéo không có lợi thế, hoặc lệnh ảo cho thấy bộ lọc chặn nhầm lệnh tốt. Báo người dùng sau khi làm | ✅ Đã bỏ: khóa lãi trong ngày; 2 lớp bảo vệ v1.31 (không có lợi thế) gỡ khỏi v1.32 |
 | C10 | **Định hướng chiều lệnh theo tiêu chí đa khung**: đủ tiêu chí (EMA/MA, Ichimoku, RSI, MACD, ADX, cấu trúc HH/HL–BOS/CHoCH, trendline, Fibo, nến đảo chiều tại S/R, phân kỳ, tin tức) trên W1/D1/H4/H1/M15/M5 thì chỉ cho Sell khi giảm đa khung, chỉ Buy khi tăng đa khung. Claude đặt `global.side` = buy/sell/both/auto qua GitHub; auto = EA tự chấm điểm đồng thuận mỗi nến | 🟡 v1.33 đã dựng (chờ biên dịch): cầu nối 2.6 đọc `global.side`, EA chặn lệnh MỚI ngược chiều, `auto` theo điểm CDS (hiện trên bảng + mkt.ctx), lệnh bị chặn ghi lý do SIDE. Kiểm tra chéo: CDS KHÔNG có lợi thế chiều (AUC ~0,51) -> dùng như công cụ giảm rủi ro, không phải tín hiệu |
-| C11 | Vào lệnh khung **M1** (M1/M5), định hướng khung lớn | ✅ Nguyên tắc nghiên cứu |
+| C11 | **Đa khung từ trên xuống, đủ mọi khung**: khung lớn định hướng (W1/D1/H4), khung giữa tìm thiết lập (H1/M30/M15), khung nhỏ kích hoạt (M5/M1). Vào lệnh trên **M1, M5 và M15**. Không chỉ dùng D1/H4 | 🟡 v1.33 điểm đồng thuận gộp W1→M5 nhưng chưa tách 3 tầng, chưa vào lệnh theo từng khung M1/M5/M15 → đang nghiên cứu cho v1.34 |
 | C12 | Điều kiện nào thiếu để điều phối có lãi thì báo người dùng hoặc tự bổ sung | ✅ Thường xuyên |
 
 ## D. Nâng cấp EA
