@@ -188,7 +188,7 @@ class Mql5StaticTest(unittest.TestCase):
 
     def test_shadow_stats(self):
         # bridge 2.5: blocked-signal shadow statistics (data.shadow), reporting only
-        self.assertIn('#define ZGB_VERSION "2.5"', self.mqh)
+        self.assertRegex(self.mqh, r'#define ZGB_VERSION "2\.[5-9]"')
         self.assertIn("#define ZGB_HAS_SHADOW", self.mqh)
         self.assertIn("#define ZGB_SHADOW_MAX 8000", self.mqh)
         setter = self._body("void ZGB_SetShadowStats(const string json_obj)")
@@ -222,6 +222,24 @@ class Mql5StaticTest(unittest.TestCase):
         pk = self._body("string ZGB_PhaseKey(const string phase)")
         self.assertIn("< 24", pk)
         self.assertIn('"none"', pk)
+
+    def test_global_side_bias(self):
+        # bridge 2.6: global.side both / buy / sell / auto (= scripts/control.py SIDES), restrict only, NEUTRAL = both
+        import control
+        self.assertRegex(self.mqh, r'#define ZGB_VERSION "2\.[6-9]"')
+        self.assertIn("#define ZGB_HAS_SIDE", self.mqh)
+        apply = self._body("bool ZGB_CtlApplyText(")
+        for name in control.SIDES:
+            self.assertIn(f'gside_s == "{name}"', apply)
+        self.assertIn('err = "global.side"; return(false);', apply)            # unknown value -> invalid file -> NEUTRAL
+        self.assertIn("g_zgbCtlSide = ZGB_SIDE_BOTH;", self._body("void ZGB_CtlClear(void)"))
+        mode = self._body("int ZGB_SideMode(void)")
+        self.assertIn("if(!ZGB_CtlGlobalActive()) return(ZGB_SIDE_BOTH);", mode)   # inactive / stale / expired / tester -> both
+        allowed = self._body("bool ZGB_SideAllowed(const int side)")
+        self.assertIn("if(m == ZGB_SIDE_BOTH || m == ZGB_SIDE_AUTO) return(true);", allowed)   # auto defers to the EA's own score
+        self.assertIn("return(m == ZGB_SIDE_BUY);", allowed)
+        self.assertIn("return(m == ZGB_SIDE_SELL);", allowed)
+
 
     def test_phase_key_matches_server(self):
         # emulate ZGB_PhaseKey and compare with agg._phase_key on the EA labels and odd input

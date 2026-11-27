@@ -284,6 +284,11 @@ def ctx_section(rep: dict, day_reports: list[dict]) -> list[str]:
         facts.append(f"ATR(H1) {f(vol.get('atrp'))} % of price (tercile {vol.get('terc', '-')}, rank {vol.get('rk', '-')})")
     if facts:
         out += ["; ".join(facts) + ".", ""]
+    if "cds" in ctx:   # EA161 v1.33 confluence direction score (x100); out of sample it has no reliable edge (AUC ~0.51)
+        per = ctx.get("cds_tf") or {}
+        tf_txt = ", ".join(f"{tf} {per[tf]:+d}" for tf in agg.CTX_CDS_TFS if tf in per)
+        out += [f"CDS {ctx['cds']:+d} -> {ctx.get('side', '-')} (EA applies global.side `{ctx.get('gside', '-')}`)"
+                + (f"; per TF {tf_txt}" if tf_txt else "") + ". Summary of the multi-TF criteria, not a signal.", ""]
     tfs = ctx.get("tf") or {}
     if tfs:
         side = {1: "above", -1: "below", 0: "in"}

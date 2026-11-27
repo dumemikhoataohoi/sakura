@@ -143,6 +143,10 @@ key, range and code; anything else is dropped and only its key name is logged. T
 | `scn` | 3-scenario forecast of the K-NN analogs: `n` analogs (100), `h` horizon (24 h), `a` continuation, `b` pullback then resume, `c` reversal, each `p` (%, int) and signed distances from the price at the report in ATR(H1): `to_atr` median 24 h target, `b.pb_atr` pullback level, `c.ext_atr` extreme against `ref`; `none` % of analogs that reached neither side. Distances are limited to +-50 ATR |
 | `dir_auc` | analog direction AUC (Mann-Whitney of the live `pl` vs the realised first-touch side) over the cases of the last 30 days with a resolved label; ~0.5 = no direction skill |
 | `cr` | crisis layer: `OFF`, `OK` or `BLOCK:<VOL SPREAD GAP NEWS DAYSTOP WEEKSTOP SAMESIDE OTHER>` |
+| `cds` | EA161 v1.33: Confluence Direction Score x 100, int -100..100 (weighted vote of EMA stack, Ichimoku, RSI, MACD, ADX/DI, HH/HL structure, BOS/CHoCH, trendline, Fibonacci 0.5-0.618 on W1..M5 + reversal candle at S/R and RSI divergence on H1/H4; 0 within +-30 min of a listed USD event). Out of sample it has no reliable directional edge (AUC ~0.51): a summary, not a signal |
+| `side` | CDS verdict: `buy` (cds >= InpCdsTheta x 100), `sell`, `flat` |
+| `gside` | `global.side` the EA applies now: `both`, `buy`, `sell`, `auto` (NEUTRAL control = `both`) |
+| `cds_tf` | per-TF sub-score x 100 (int -100..100) for `W1 D1 H4 H1 M15 M5` |
 
 The daily page renders the last context of the day and a scenario log of every report of the day. A `heartbeat` that is
 identical to the previous stored report of that account and day (apart from `ts`) is not stored, so it creates no commit.
@@ -163,7 +167,7 @@ real trades. Counts and R only: **no prices, no times, no method names**. Size <
 Reasons (first block wins, in the EA's order): `CAP` base-slot pre-check (MaxOpen, same entry, NO-STACK); then at the order
 entry `CELL` (phase cell mask off, S4 direction / pullback), `NEWS` (news-day veto, crisis NewsFlat window), `CAP` (max per
 method, max open = open-risk cap, one entry per minute and side, EA131 aggregate risk / margin), `BREAKER` (bad-month
-breaker), `CTRL` (control channel: pause, disabled, `risk_mult` 0, extra news block), `SPREAD` (crisis spread spike, EA131
+breaker), `CTRL` (control channel: pause, disabled, `risk_mult` 0, extra news block), `SIDE` (v1.33 direction bias: `global.side` buy / sell / auto against the CDS, or the local `InpCdsGate`), `SPREAD` (crisis spread spike, EA131
 spread limit, EA136 spread-to-risk), `CRISIS` (volatility, gap, day/week stop, max same side), `OTHER` (weekend cut, EA134 /
 EA136 / EA135, broker). A NEWS / CAP signal whose phase cell is off counts as `CELL`; signals of methods that are not in the
 active selection are not recorded. Engine-local pre-checks inside modules, lanes and M1 engines are not counted.

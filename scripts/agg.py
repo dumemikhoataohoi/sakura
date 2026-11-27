@@ -51,10 +51,14 @@ CTX_PHASE_RE = re.compile(r"^[A-Z]{2,8}$")
 CTX_CR_RE = re.compile(r"^(?:OFF|OK|BLOCK(?::(?:VOL|SPREAD|GAP|NEWS|DAYSTOP|WEEKSTOP|SAMESIDE|OTHER))?)$")
 CTX_ATR_MAX = 50.0                                                # |distance| in ATR(H1) units; a price is far above this
 CTX_SCN = {"a": ("p", "to_atr"), "b": ("p", "pb_atr", "to_atr"), "c": ("p", "to_atr", "ext_atr")}
+# EA161 v1.33: Confluence Direction Score (x100, -100..100), its side, the global.side the EA applies, per-TF sub-scores
+CTX_CDS_TFS = ("W1", "D1", "H4", "H1", "M15", "M5")
+CTX_CDS_SIDES = ("buy", "sell", "flat")
+CTX_GSIDES = ("both", "buy", "sell", "auto")
 
 
 # ---- data.shadow (bridge 2.5 / EA161 v1.32): blocked signals traded virtually at 1R (counts and R only, no prices / times / names)
-SHADOW_REASONS = ("CELL", "CTRL", "NEWS", "CRISIS", "CAP", "SPREAD", "BREAKER", "OTHER")
+SHADOW_REASONS = ("CELL", "CTRL", "NEWS", "CRISIS", "CAP", "SPREAD", "BREAKER", "OTHER", "SIDE")   # SIDE: v1.33 direction bias
 SHADOW_PERIODS = ("day", "week", "mtd", "r30")
 _SHADOW_RS = "|".join(SHADOW_REASONS)
 SHADOW_METHOD_RE = re.compile(rf"^M\d{{3}}:(?:{_SHADOW_RS})$")
@@ -258,6 +262,14 @@ def sanitize_ctx(obj, stripped: set, path: str = "data.mkt.ctx") -> dict | None:
                 else:
                     scn[sk] = sval
             val = scn if any(s in scn for s in CTX_SCN) else None
+        elif k == "cds":
+            val = _int_in(v, -100, 100)
+        elif k == "side":
+            val = v if v in CTX_CDS_SIDES else None
+        elif k == "gside":
+            val = v if v in CTX_GSIDES else None
+        elif k == "cds_tf" and isinstance(v, dict):
+            val = _fields(v, f"{path}.cds_tf", stripped, {tf: (lambda x: _int_in(x, -100, 100)) for tf in CTX_CDS_TFS}) or None
         elif k == "dir_auc":
             val = _float_in(v, 0.0, 1.0, 3)
         elif k == "cr":

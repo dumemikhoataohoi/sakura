@@ -26,6 +26,12 @@
 //|  reports: counts / R of the EA's blocked signals traded         |
 //|  virtually (by reason, method code x reason, phase x reason; no |
 //|  prices, times or method names). Reporting only.                |
+//|  2.6: global.side = both / buy / sell / auto (R09): direction    |
+//|  bias for NEW entries only. ZGB_SideAllowed(side) = true when the |
+//|  control is NEUTRAL (inactive / stale / expired / tester), when   |
+//|  side is both or auto (auto = the EA's own confluence score      |
+//|  decides: ZGB_SideMode() == ZGB_SIDE_AUTO), or when it matches.   |
+//|  Never opens, closes or modifies a position.                     |
 //|  2.5 FIX: ZGB_CodeForComment(cmt) is the one comment -> M### path|
 //|  for reports (entry deal comment) AND control (the EA passes the |
 //|  order comment); control phases are keyed like the server       |
@@ -75,11 +81,16 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.5"
+#define ZGB_VERSION "2.6"
 #define ZGB_HAS_MKTCTX                 // 2.4: ZGB_SetMarketCtx available (EA161 v1.31 tests this)
 #define ZGB_CTX_MAX 1800               // 2.4: max bytes of the mkt.ctx object
 #define ZGB_HAS_SHADOW                 // 2.5: ZGB_SetShadowStats available (EA161 v1.32 tests this)
 #define ZGB_SHADOW_MAX 8000            // 2.5: max bytes of the data.shadow object
+#define ZGB_HAS_SIDE                   // 2.6: global.side direction bias (ZGB_SideMode / ZGB_SideAllowed; EA161 v1.33 tests this)
+#define ZGB_SIDE_BOTH  0               // 2.6: global.side values (= sakura scripts/control.py SIDES)
+#define ZGB_SIDE_BUY   1
+#define ZGB_SIDE_SELL  (-1)
+#define ZGB_SIDE_AUTO  2
 #define ZGB_CTL_CACHE   "zumi_gh_control.json"
 #define ZGB_CTL_STALE_S (72 * 3600)
 #define ZGB_CTL_MAX_TTL (7 * 86400)
@@ -905,6 +916,14 @@ bool     g_zgbCtlWasActive = false;
 double   g_zgbCtlGMult   = 1.0;
 bool     g_zgbCtlPauseAll = false;
 double   g_zgbCtlORP     = 0.0;     // 2.3: global.open_risk_pct (0 = no remote value)
+int      g_zgbCtlSide    = ZGB_SIDE_BOTH;   // 2.6: global.side (both = no restriction)
+string ZGB_SideName(const int mode)          // 2.6: global.side value -> name (log / panel / mkt.ctx)
+  {
+   if(mode == ZGB_SIDE_BUY) return("buy");
+   if(mode == ZGB_SIDE_SELL) return("sell");
+   if(mode == ZGB_SIDE_AUTO) return("auto");
+   return("both");
+  }
 long     g_zgbCtlGExp    = 0;
 string   g_zgbCtlGReason = "";
 string   g_zgbCtlCode[];
@@ -982,7 +1001,7 @@ double ZGB_Clamp(const double v, const double lo, const double hi) { return(Math
 void ZGB_CtlClear(void)
   {
    g_zgbCtlValid = false;
-   g_zgbCtlGMult = 1.0; g_zgbCtlPauseAll = false; g_zgbCtlORP = 0.0; g_zgbCtlGExp = 0; g_zgbCtlGReason = "";
+   g_zgbCtlGMult = 1.0; g_zgbCtlPauseAll = false; g_zgbCtlORP = 0.0; g_zgbCtlSide = ZGB_SIDE_BOTH; g_zgbCtlGExp = 0; g_zgbCtlGReason = "";
    ArrayResize(g_zgbCtlCode, 0); ArrayResize(g_zgbCtlMode, 0); ArrayResize(g_zgbCtlMult, 0);
    ArrayResize(g_zgbCtlPhases, 0); ArrayResize(g_zgbCtlExp, 0); ArrayResize(g_zgbCtlReason, 0);
    ArrayResize(g_zgbCtlWKind, 0); ArrayResize(g_zgbCtlWStart, 0); ArrayResize(g_zgbCtlWEnd, 0); ArrayResize(g_zgbCtlWReason, 0);
@@ -1011,6 +1030,16 @@ bool ZGB_CtlApplyText(const string &s, const bool save, string &err)
      {
       if(MathIsValidNumber(v) && v >= ZGB_ORP_MIN && v <= ZGB_ORP_MAX) orp = v;
       else PrintFormat("ZumiGitHubBridge control: global.open_risk_pct %.4f outside [%.0f, %.0f] -> ignored (EA local cap)", v, ZGB_ORP_MIN, ZGB_ORP_MAX);
+     }
+   int gside = ZGB_SIDE_BOTH;                                         // 2.6: absent = both; an unknown value makes the file invalid (NEUTRAL)
+   string gside_s = "";
+   if(ZGB_JString(s, "global.side", gside_s))
+     {
+      if(gside_s == "both") gside = ZGB_SIDE_BOTH;
+      else if(gside_s == "buy") gside = ZGB_SIDE_BUY;
+      else if(gside_s == "sell") gside = ZGB_SIDE_SELL;
+      else if(gside_s == "auto") gside = ZGB_SIDE_AUTO;
+      else { err = "global.side"; return(false); }
      }
    long gexp = ZGB_JTime(s, "global.expires");
    if(gexp <= 0) gexp = upd + 48 * 3600;
@@ -1082,6 +1111,9 @@ bool ZGB_CtlApplyText(const string &s, const bool save, string &err)
    if(orp != g_zgbCtlORP || !g_zgbCtlValid)
       PrintFormat("ZumiGitHubBridge control: global open_risk_pct %s until %s UTC (%s)%s", orp > 0 ? StringFormat("%.2f%%", orp) : "none (EA local cap)",
                   TimeToString((datetime)gexp, TIME_DATE | TIME_MINUTES), greason, (gexp <= (long)TimeGMT()) ? " (inactive: expired)" : "");
+   if(gside != g_zgbCtlSide || !g_zgbCtlValid)
+      PrintFormat("ZumiGitHubBridge control: global side %s until %s UTC (%s)%s", ZGB_SideName(gside),
+                  TimeToString((datetime)gexp, TIME_DATE | TIME_MINUTES), greason, (gexp <= (long)TimeGMT()) ? " (inactive: expired)" : "");
    if(gm != g_zgbCtlGMult || (pa != 0) != g_zgbCtlPauseAll || !g_zgbCtlValid)
       PrintFormat("ZumiGitHubBridge control: global risk_mult %.2f (cap %.2f) pause_all %s until %s UTC (%s)", gm,
                   ZGB_Clamp(InpGhMaxRiskMult, 0.0, ZGB_CTL_MAXMULT), pa != 0 ? "true" : "false",
@@ -1105,7 +1137,7 @@ bool ZGB_CtlApplyText(const string &s, const bool save, string &err)
                   TimeToString((datetime)we[q], TIME_DATE | TIME_MINUTES), wr[q]);
    ZGB_CtlClear();
    g_zgbCtlSeq = (long)seq; g_zgbCtlUpdated = upd;
-   g_zgbCtlGMult = gm; g_zgbCtlPauseAll = (pa != 0); g_zgbCtlORP = orp; g_zgbCtlGExp = gexp; g_zgbCtlGReason = greason;
+   g_zgbCtlGMult = gm; g_zgbCtlPauseAll = (pa != 0); g_zgbCtlORP = orp; g_zgbCtlSide = gside; g_zgbCtlGExp = gexp; g_zgbCtlGReason = greason;
    ArrayResize(g_zgbCtlCode, nm); ArrayResize(g_zgbCtlMode, nm); ArrayResize(g_zgbCtlMult, nm);
    ArrayResize(g_zgbCtlPhases, nm); ArrayResize(g_zgbCtlExp, nm); ArrayResize(g_zgbCtlReason, nm);
    for(int k = 0; k < nm; k++)
@@ -1192,6 +1224,23 @@ int ZGB_CtlDirective(const string method_name, const string phase_label)
   }
 
 bool ZGB_CtlGlobalActive(void) { return(ZGB_CtlActive() && (long)TimeGMT() < g_zgbCtlGExp); }
+
+// 2.6: global.side in force now. NEUTRAL (channel off, tester, invalid / stale > 72 h file, global block expired) = both.
+int ZGB_SideMode(void)
+  {
+   if(!ZGB_CtlGlobalActive()) return(ZGB_SIDE_BOTH);
+   return(g_zgbCtlSide);
+  }
+// May a NEW entry on this side (+1 buy, -1 sell) be opened? Restrict only: true when NEUTRAL, both, or auto (auto defers to the
+// EA's own confluence score: the EA checks ZGB_SideMode() == ZGB_SIDE_AUTO itself), or when the side matches.
+bool ZGB_SideAllowed(const int side)
+  {
+   int m = ZGB_SideMode();
+   if(m == ZGB_SIDE_BOTH || m == ZGB_SIDE_AUTO) return(true);
+   if(side > 0) return(m == ZGB_SIDE_BUY);
+   if(side < 0) return(m == ZGB_SIDE_SELL);
+   return(true);
+  }
 
 // Risk multiplier for a method in a phase: global x method, clamped to [0, InpGhMaxRiskMult] (and never above 2.0).
 double ZGB_RiskMult(const string method_name, const string phase_label)

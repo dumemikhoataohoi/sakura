@@ -62,6 +62,7 @@ account; the repository stores each one that changed (one commit each) and skips
 | `ZGB_SetPhase(s)` | current phase (recorded per position at entry, used for per-phase statistics) |
 | `ZGB_SetMarketCtx(json)` | 2.4: market-context object sent as `mkt.ctx` in every report (EA161 v1.31 calls it on each new M15 bar). Accepted only as one JSON object <= 1800 bytes of `[A-Za-z0-9_:.,{}[]"-]`; otherwise the last good block is kept. Fields: see `docs/data-dictionary.md` |
 | `ZGB_SetShadowStats(json)` | 2.5: blocked-signal shadow statistics sent as `data.shadow` in aggregate reports (EA161 v1.32 calls it on each new M15 bar and at most every 5 min after a change). Same charset rule as the market context, <= 8000 bytes; otherwise the last good block is kept. Fields: see `docs/data-dictionary.md` |
+| `ZGB_SideMode()`, `ZGB_SideAllowed(side)`, `ZGB_SideName(mode)` | 2.6 (`#define ZGB_HAS_SIDE`): `global.side` in force (`ZGB_SIDE_BOTH 0`, `ZGB_SIDE_BUY 1`, `ZGB_SIDE_SELL -1`, `ZGB_SIDE_AUTO 2`; NEUTRAL / expired / stale / tester = both). `ZGB_SideAllowed(+1/-1)` is true for both, auto (the EA then applies its own CDS) and the matching side. EA161 v1.33 checks it for NEW entries of its magics inside its control step (reason `SIDE` in the shadow statistics); the bridge itself never trades |
 | `ZGB_Log(s)` | phase/analysis log line: sent only in mode 1 (in mode 0 it is discarded at each report) |
 | `ZGB_Flag(key, msg)` | EA-raised alert: next report (-> alerts PR comment) and Telegram/Discord. In mode 0 `msg` is published: no prices in it |
 | `ZGB_SendReport(reason)` | build a report now (queued; flushed by `ZGB_OnTimer`). In mode 0 prefer the automatic slots |
@@ -148,7 +149,7 @@ simply sends no context.
 ## Blocked-signal shadow statistics (bridge 2.5)
 
 `#define ZGB_HAS_SHADOW` marks the 2.5 API. EA161 v1.32 records every signal that reached its order entry and was not
-sent (reason codes `CELL CTRL NEWS CRISIS CAP SPREAD BREAKER OTHER`), trades it virtually with the same SL and the TP the
+sent (reason codes `CELL CTRL NEWS CRISIS CAP SPREAD BREAKER OTHER`, v1.33 + `SIDE`), trades it virtually with the same SL and the TP the
 order would have had, resolves it on closed M1 bars only (24 h time-out) and keeps the open and resolved virtual trades in
 `MQL5\Files\ZumiMem\<symbol>_<magic base>\shadow132_open.csv` / `shadow132_res.csv` (40 days), so restarts lose nothing.
 It hands only counts and R to `ZGB_SetShadowStats`; the bridge adds them as `data.shadow` to aggregate reports (not to

@@ -144,5 +144,16 @@ class ShadowRenderTest(unittest.TestCase):
                       (root / "reports/daily/2026-11-25.md").read_text())
 
 
+class ShadowSideReasonTest(unittest.TestCase):
+    def test_side_reason_accepted(self):
+        sh = copy.deepcopy(SHADOW)
+        sh["periods"]["day"]["SIDE"] = {"n": 3, "wins": 1, "losses": 2, "to": 0, "net_r": -1.0}   # v1.33 direction bias
+        sh["by_method"]["M132:SIDE"] = {"n": 3, "wins": 1, "net_r": -1.0}
+        sh["by_phase"]["SDPBN:SIDE"] = {"n": 3, "wins": 1, "net_r": -1.0}
+        stripped = set()
+        self.assertEqual(agg.sanitize_shadow(copy.deepcopy(sh), stripped), sh)
+        self.assertEqual(stripped, set())
+
+
 if __name__ == "__main__":
     unittest.main()

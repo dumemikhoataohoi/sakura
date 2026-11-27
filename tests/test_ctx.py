@@ -173,5 +173,34 @@ class CtxRenderTest(unittest.TestCase):
         self.assertNotIn("Market context", (root / "reports/weekly/2026-W48.md").read_text())
 
 
+class CdsCtxTest(unittest.TestCase):
+    """EA161 v1.33: confluence direction score in mkt.ctx (ints x100, side words only)."""
+    CDS = {"cds": 34, "side": "buy", "gside": "auto", "cds_tf": {"W1": -22, "D1": 41, "H4": 63, "H1": 55, "M15": 0, "M5": -11}}
+
+    def test_valid_cds_fields_pass(self):
+        ctx = dict(copy.deepcopy(CTX), **copy.deepcopy(self.CDS))
+        stripped = set()
+        self.assertEqual(agg.sanitize_ctx(copy.deepcopy(ctx), stripped), ctx)
+        self.assertEqual(stripped, set())
+        self.assertLess(len(json.dumps(ctx, separators=(",", ":"))), 1800)   # bridge ZGB_CTX_MAX
+
+    def test_invalid_cds_fields_are_stripped(self):
+        bad = {"cds": 150, "side": "long", "gside": "both;", "cds_tf": {"W1": 10, "H2": 5, "D1": 0.5, "H4": 4100}}
+        stripped = set()
+        out = agg.sanitize_ctx(dict(copy.deepcopy(CTX), **bad), stripped)
+        for k in ("cds", "side", "gside"):
+            self.assertNotIn(k, out)
+        self.assertEqual(out["cds_tf"], {"W1": 10})
+        self.assertTrue(any("cds_tf" in x for x in stripped))
+        self.assertIsNone(agg.sanitize_ctx({"cds_tf": {"D1": 4100}}, set()))
+
+    def test_daily_summary_shows_cds(self):
+        rep = {"ts": int(NOW.timestamp()), "data": {"mkt": {"ctx": dict(copy.deepcopy(CTX), **copy.deepcopy(self.CDS))}}}
+        txt = "\n".join(daily_summary.ctx_section(rep, [rep]))
+        self.assertIn("CDS +34 -> buy", txt)
+        self.assertIn("global.side `auto`", txt)
+        self.assertIn("H4 +63", txt)
+
+
 if __name__ == "__main__":
     unittest.main()
