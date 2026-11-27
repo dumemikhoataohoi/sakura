@@ -1,0 +1,41 @@
+{
+  "accounts": [
+    "3238681b19703d89"
+  ],
+  "as_of": "2026-11-27T06:00:00Z",
+  "changes": [
+    "global risk_mult 0.50->1.00 (R00)",
+    "global open_risk_pct EA default (R00)"
+  ],
+  "errors": [],
+  "hits": [],
+  "proposal": {
+    "author": "claude",
+    "global": {
+      "expires_unix": 1795932000,
+      "expires_utc": "2026-11-29T06:00:00Z",
+      "pause_all": false,
+      "reason_code": "R00",
+      "risk_mult": 1.0
+    },
+    "methods": {
+      "M701": {
+        "expires_unix": 1795906800,
+        "expires_utc": "2026-11-28T23:00:00Z",
+        "mode": "pause",
+        "phases": [
+          "none"
+        ],
+        "reason_code": "R01",
+        "risk_mult": 0.0
+      }
+    },
+    "news_blocks": [],
+    "notes_vi": "\u0110\u1ec1 xu\u1ea5t t\u1ef1 \u0111\u1ed9ng theo quy t\u1eafc \u0111\u0103ng k\u00fd tr\u01b0\u1edbc; Claude xem x\u00e9t v\u00e0 quy\u1ebft \u0111\u1ecbnh.",
+    "seq": 4,
+    "updated_unix": 1795759200,
+    "updated_utc": "2026-11-27T06:00:00Z",
+    "v": 1
+  },
+  "restored": []
+}
