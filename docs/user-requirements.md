@@ -32,6 +32,8 @@ Cập nhật lần cuối: 2026-11-27.
 | B7 | EA đóng vai **chuyên gia phân tích**: bảng thông tin + log (giai đoạn từng khung, kịch bản, phương pháp đang bật/dừng, lý do) | ✅ |
 | B8 | EA như **1 AI agent với ~15 agent con** (các họ phương pháp) + Claude điều phối phía trên | ✅ |
 | B9 | **Claude phải phân tích đa khung, mô hình và tín hiệu đảo chiều, tin tức TRƯỚC mỗi quyết định điều phối** | 🟡 Đã đưa vào quy trình từ 27/11. Dữ liệu đa khung đầy đủ cần v1.31 (gửi mỗi giờ) |
+| B10 | Khi thiếu dữ liệu, dùng thêm nguồn **miễn phí bên ngoài** | 🟡 Lịch kinh tế USD (tin High/Medium, tuần này và tuần sau) lấy tự động mỗi giờ → `data/calendar/ff_week.json`. Nguồn giá vàng miễn phí (stooq) chặn máy chủ GitHub, nên dữ liệu giá đa khung lấy từ EA (v1.31) |
+| B11 | Claude chủ động đề xuất và bổ sung cho EA những gì cần thêm, mục tiêu **có lợi nhuận mỗi ngày** | 🟡 v1.31 thêm 3 lớp bảo vệ (khóa lãi trong ngày, giới hạn lệnh cùng chiều dồn dập, chặn lệnh ngược tín hiệu đảo chiều H1/H4). Mặc định TẮT; kiểm tra trên 12 tháng + kiểm tra chéo rồi mới bật |
 
 ## C. Điều phối (Claude qua GitHub sakura)
 
