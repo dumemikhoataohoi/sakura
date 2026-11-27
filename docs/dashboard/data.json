@@ -3,18 +3,18 @@
   "aggregates": {
     "3238681b19703d89": {
       "all": {
-        "avg_r": 0.002,
+        "avg_r": 0.06,
         "be": 0,
-        "cur_ls": 1,
+        "cur_ls": 0,
         "dd_pct": 0.73,
         "losses": 8,
         "max_ls": 3,
-        "n": 16,
-        "net_pct": -0.087,
-        "net_r": 0.027,
-        "pf": 1.0,
-        "win_pct": 50.0,
-        "wins": 8
+        "n": 17,
+        "net_pct": 0.161,
+        "net_r": 1.027,
+        "pf": 1.13,
+        "win_pct": 52.9,
+        "wins": 9
       },
       "as_of": "2026-11-27",
       "by_method": {
@@ -37,6 +37,15 @@
           "wins": 0
         },
         "M237": {
+          "cur_ls": 0,
+          "l20_n": 1,
+          "l20_wins": 1,
+          "n": 1,
+          "net_r": 1.0,
+          "win_pct": 100.0,
+          "wins": 1
+        },
+        "M279": {
           "cur_ls": 0,
           "l20_n": 1,
           "l20_wins": 1,
@@ -120,13 +129,13 @@
       },
       "by_phase": {
         "SDCTRH": {
-          "cur_ls": 1,
-          "l20_n": 5,
-          "l20_wins": 3,
-          "n": 5,
-          "net_r": 0.995,
-          "win_pct": 60.0,
-          "wins": 3
+          "cur_ls": 0,
+          "l20_n": 6,
+          "l20_wins": 4,
+          "n": 6,
+          "net_r": 1.995,
+          "win_pct": 66.7,
+          "wins": 4
         },
         "SDPBL": {
           "cur_ls": 0,
@@ -163,18 +172,18 @@
           "wins": 10
         },
         "2026-11-27": {
-          "avg_r": 0.002,
+          "avg_r": 0.06,
           "be": 0,
-          "cur_ls": 1,
+          "cur_ls": 0,
           "dd_pct": 0.73,
           "losses": 8,
           "max_ls": 3,
-          "n": 16,
-          "net_pct": -0.087,
-          "net_r": 0.027,
-          "pf": 1.0,
-          "win_pct": 50.0,
-          "wins": 8
+          "n": 17,
+          "net_pct": 0.161,
+          "net_r": 1.027,
+          "pf": 1.13,
+          "win_pct": 52.9,
+          "wins": 9
         }
       },
       "grid": {
@@ -196,38 +205,41 @@
             "n": 6,
             "win_pct": 50.0,
             "wins": 3
+          },
+          "16": {
+            "n": 1
           }
         }
       },
       "months": {
         "2026-11": {
-          "avg_r": 0.002,
+          "avg_r": 0.06,
           "be": 0,
-          "cur_ls": 1,
+          "cur_ls": 0,
           "dd_pct": 0.73,
           "losses": 8,
           "max_ls": 3,
-          "n": 16,
-          "net_pct": -0.087,
-          "net_r": 0.027,
-          "pf": 1.0,
-          "win_pct": 50.0,
-          "wins": 8
+          "n": 17,
+          "net_pct": 0.161,
+          "net_r": 1.027,
+          "pf": 1.13,
+          "win_pct": 52.9,
+          "wins": 9
         }
       },
       "mtd": {
-        "avg_r": 0.002,
+        "avg_r": 0.06,
         "be": 0,
-        "cur_ls": 1,
+        "cur_ls": 0,
         "dd_pct": 0.73,
         "losses": 8,
         "max_ls": 3,
-        "n": 16,
-        "net_pct": -0.087,
-        "net_r": 0.027,
-        "pf": 1.0,
-        "win_pct": 50.0,
-        "wins": 8
+        "n": 17,
+        "net_pct": 0.161,
+        "net_r": 1.027,
+        "pf": 1.13,
+        "win_pct": 52.9,
+        "wins": 9
       },
       "rule": {
         "daily_cap": 0,
@@ -236,18 +248,18 @@
         "risk_cap": 0
       },
       "week": {
-        "avg_r": 0.002,
+        "avg_r": 0.06,
         "be": 0,
-        "cur_ls": 1,
+        "cur_ls": 0,
         "dd_pct": 0.73,
         "losses": 8,
         "max_ls": 3,
-        "n": 16,
-        "net_pct": -0.087,
-        "net_r": 0.027,
-        "pf": 1.0,
-        "win_pct": 50.0,
-        "wins": 8
+        "n": 17,
+        "net_pct": 0.161,
+        "net_r": 1.027,
+        "pf": 1.13,
+        "win_pct": 52.9,
+        "wins": 9
       }
     }
   },
