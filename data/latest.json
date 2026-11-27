@@ -47,8 +47,8 @@
     "vix_high": 0,
     "vix_jump": 0
   },
-  "generated_unix": 1795753066,
-  "generated_utc": "2026-11-27T04:17:46Z",
+  "generated_unix": 1795792127,
+  "generated_utc": "2026-11-27T15:08:47Z",
   "schema": "zumi.latest",
   "series": {
     "DCOILWTICO": {
@@ -115,13 +115,13 @@
       "v": 2.12
     },
     "VIXCLS": {
-      "age": 3,
-      "c1": -0.26,
-      "c1p": -0.977,
-      "c5": 0.9,
-      "d": "2026-11-24",
-      "p": 26.62,
-      "v": 26.36
+      "age": 1,
+      "c1": -1.49,
+      "c1p": -5.267,
+      "c5": -1.64,
+      "d": "2026-11-26",
+      "p": 28.29,
+      "v": 26.8
     }
   },
   "stale_after_h": 36,
