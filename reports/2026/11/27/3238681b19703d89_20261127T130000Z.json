@@ -1,0 +1,762 @@
+{
+  "acct": "3238681b19703d89",
+  "data": {
+    "day": "2026-11-27",
+    "ea": "Zumi",
+    "eq": {
+      "day_pl_pct": -0.597,
+      "eq_day_pct": -0.354,
+      "float_pct": 0.244
+    },
+    "flags": [],
+    "mkt": {
+      "move_atr": 1.01,
+      "sym": "XAUUSDm"
+    },
+    "periods": {
+      "day": {
+        "avg_r": -0.247,
+        "be": 0,
+        "by_method": {
+          "M132": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M132:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 2,
+            "l20_wins": 2,
+            "n": 2,
+            "net_r": 2.024,
+            "win_pct": 100.0,
+            "wins": 2
+          },
+          "SDPBN": {
+            "cur_ls": 3,
+            "l20_n": 6,
+            "l20_wins": 1,
+            "n": 6,
+            "net_r": -4.0,
+            "win_pct": 16.7,
+            "wins": 1
+          }
+        },
+        "cur_ls": 3,
+        "dd_pct": 0.73,
+        "from": "2026-11-27",
+        "gross_loss_r": 5.0,
+        "gross_win_r": 3.024,
+        "lead_ls": 0,
+        "losses": 5,
+        "mae_r": -0.697,
+        "max_ls": 3,
+        "mfe_r": 0.508,
+        "n": 8,
+        "n_ex": 8.0,
+        "n_r": 8.0,
+        "net_pct": -0.597,
+        "net_r": -1.976,
+        "pf": 0.6,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 37.5,
+        "wins": 3
+      },
+      "mtd": {
+        "avg_r": -0.247,
+        "be": 0,
+        "by_method": {
+          "M132": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M132:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 2,
+            "l20_wins": 2,
+            "n": 2,
+            "net_r": 2.024,
+            "win_pct": 100.0,
+            "wins": 2
+          },
+          "SDPBN": {
+            "cur_ls": 3,
+            "l20_n": 6,
+            "l20_wins": 1,
+            "n": 6,
+            "net_r": -4.0,
+            "win_pct": 16.7,
+            "wins": 1
+          }
+        },
+        "cur_ls": 3,
+        "dd_pct": 0.73,
+        "from": "2026-11-01",
+        "grid": {
+          "Fri": {
+            "00": {
+              "n": 1
+            },
+            "04": {
+              "n": 4,
+              "win_pct": 50.0,
+              "wins": 2
+            },
+            "08": {
+              "n": 2
+            },
+            "12": {
+              "n": 1
+            }
+          }
+        },
+        "gross_loss_r": 5.0,
+        "gross_win_r": 3.024,
+        "lead_ls": 0,
+        "losses": 5,
+        "mae_r": -0.697,
+        "max_ls": 3,
+        "mfe_r": 0.508,
+        "n": 8,
+        "n_ex": 8.0,
+        "n_r": 8.0,
+        "net_pct": -0.597,
+        "net_r": -1.976,
+        "pf": 0.6,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 37.5,
+        "wins": 3
+      },
+      "r30": {
+        "avg_r": -0.247,
+        "be": 0,
+        "by_method": {
+          "M132": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M132:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 2,
+            "l20_wins": 2,
+            "n": 2,
+            "net_r": 2.024,
+            "win_pct": 100.0,
+            "wins": 2
+          },
+          "SDPBN": {
+            "cur_ls": 3,
+            "l20_n": 6,
+            "l20_wins": 1,
+            "n": 6,
+            "net_r": -4.0,
+            "win_pct": 16.7,
+            "wins": 1
+          }
+        },
+        "cur_ls": 3,
+        "dd_pct": 0.73,
+        "from": "2026-10-28",
+        "gross_loss_r": 5.0,
+        "gross_win_r": 3.024,
+        "lead_ls": 0,
+        "losses": 5,
+        "mae_r": -0.697,
+        "max_ls": 3,
+        "mfe_r": 0.508,
+        "n": 8,
+        "n_ex": 8.0,
+        "n_r": 8.0,
+        "net_pct": -0.597,
+        "net_r": -1.976,
+        "pf": 0.6,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 37.5,
+        "wins": 3
+      },
+      "week": {
+        "avg_r": -0.247,
+        "be": 0,
+        "by_method": {
+          "M132": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M132:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 2,
+            "l20_wins": 1,
+            "n": 2,
+            "net_r": 0.0,
+            "win_pct": 50.0,
+            "wins": 1
+          },
+          "M222:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          },
+          "M512:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M581:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M583:SDPBN": {
+            "cur_ls": 1,
+            "l20_n": 1,
+            "l20_wins": 0,
+            "n": 1,
+            "net_r": -1.0,
+            "win_pct": 0.0,
+            "wins": 0
+          },
+          "M812:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.024,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 2,
+            "l20_wins": 2,
+            "n": 2,
+            "net_r": 2.024,
+            "win_pct": 100.0,
+            "wins": 2
+          },
+          "SDPBN": {
+            "cur_ls": 3,
+            "l20_n": 6,
+            "l20_wins": 1,
+            "n": 6,
+            "net_r": -4.0,
+            "win_pct": 16.7,
+            "wins": 1
+          }
+        },
+        "cur_ls": 3,
+        "dd_pct": 0.73,
+        "from": "2026-11-20",
+        "gross_loss_r": 5.0,
+        "gross_win_r": 3.024,
+        "lead_ls": 0,
+        "losses": 5,
+        "mae_r": -0.697,
+        "max_ls": 3,
+        "mfe_r": 0.508,
+        "n": 8,
+        "n_ex": 8.0,
+        "n_r": 8.0,
+        "net_pct": -0.597,
+        "net_r": -1.976,
+        "pf": 0.6,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 37.5,
+        "wins": 3
+      }
+    },
+    "phase": "SDCTRH",
+    "reason": "periodic",
+    "ver": "2.3"
+  },
+  "kind": "ea_agg",
+  "part": 1,
+  "parts": 1,
+  "rid": "3238681b19703d89-1795784400",
+  "ts": 1795784400,
+  "v": 2
+}
