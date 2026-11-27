@@ -11,7 +11,8 @@ import datetime as dt
 import io
 from pathlib import Path
 
-from zumi_common import rnd, write_text_atomic
+import vault
+from zumi_common import rnd
 
 STOOQ_URL = "https://stooq.com/q/d/l/"
 
@@ -45,9 +46,9 @@ def parse_ohlc_csv(text: str) -> list[Bar]:
 
 
 def read_bars(path: Path) -> list[Bar]:
-    if not path.exists():
+    if not vault.exists(path):
         return []
-    return parse_ohlc_csv(path.read_text(encoding="utf-8"))
+    return parse_ohlc_csv(vault.read_text(path))
 
 
 def merge_bars(old: list[Bar], new: list[Bar]) -> list[Bar]:
@@ -59,11 +60,7 @@ def merge_bars(old: list[Bar], new: list[Bar]) -> list[Bar]:
 def write_bars_if_changed(path: Path, bars: list[Bar]) -> bool:
     lines = ["date,open,high,low,close"]
     lines += [f"{d},{o:g},{h:g},{lo:g},{c:g}" for d, o, h, lo, c in bars]
-    text = "\n".join(lines) + "\n"
-    if path.exists() and path.read_text(encoding="utf-8") == text:
-        return False
-    write_text_atomic(path, text)
-    return True
+    return vault.write_text(path, "\n".join(lines) + "\n")
 
 
 def atr(bars: list[Bar], n: int = 14) -> float | None:

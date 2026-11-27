@@ -35,11 +35,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Vault gate, first: fail fast on a missing / wrong key (vault.key_fp), an undecryptable .zv or a vault-set file
+      # left in plaintext. Vault off and no .zv: passes without a key. The key is never printed.
+      - name: Vault check
+        env:
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
+        run: python scripts/vault.py check
+
       - name: Validate control.json (bounds, expiry, seq, normalized form)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           BEFORE: ${{ github.event.before }}
+          # vault: control.json(.zv) in phase 2 and the encrypted control_invalid alert comment
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
         run: |
           prev="${BEFORE:-HEAD^}"
           python scripts/control.py check --prev-ref "$prev" --alert-on-fail

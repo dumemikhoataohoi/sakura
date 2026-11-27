@@ -22,7 +22,9 @@ void OnTradeTransaction(const MqlTradeTransaction &t, const MqlTradeRequest &q, 
 
 4. Inputs: `InpGhEnable=true`, `InpGhOwner`/`InpGhRepo`, your own private `InpGhAccountSalt`, the token (input
    `InpGhToken` or first line of `MQL5\Files\zumi_gh_token.txt`), and **keep `InpGhReportMode=0`** for this public repo.
-   Never put the token in source code or in the repository.
+   Never put the token in source code or in the repository. Bridge 2.8: the key file `MQL5\Files\zumi_vault.key`
+   (first line = the repo secret `ZUMI_KEY`) once the repository encrypts `control.json` / `latest.json` (vault phase 2;
+   see "Vault" below). Never an input; leave the file absent before.
 5. Reports count only the host EA's trades when the EA calls `ZGB_SetMagicRange(lo, hi)` before `ZGB_Init()`
    (EA161 uses `InpMagicBase .. InpMagicBase+9999`). Without it (bridge 2.1 behaviour) every trade on the account
    matching `InpGhMagicFilter`/`InpGhSymbolFilter` is counted, including other EAs and manual trades.
@@ -70,6 +72,7 @@ account; the repository stores each one that changed (one commit each) and skips
 | `ZGB_OnTick()` | tracks min/max price of open positions for MAE/MFE (no network) |
 | `ZGB_OnTradeTransaction(t)` | `DEAL_ADD`: remember the phase at entry; a closing deal marks a report as due |
 | `ZGB_Deinit()` | write a pending report to the queue (no network in `OnDeinit`) |
+| `ZGB_VaultDecrypt(path, text, out)` | 2.8 (`#define ZGB_HAS_VAULT`): verify and decrypt a ZV2 text fetched from `<path>.zv` with the key from `zumi_vault.key`; false on any failure (used internally for control / latest) |
 
 ## Control channel (`InpGhControlEnable`, default false)
 
@@ -141,6 +144,66 @@ Both come from the deal history (entry deal type and time) at each report, so re
 changes. No new input (41 `input` lines, of which 3 are groups), no price, ticket, time or method name. `scripts/agg.py`
 whitelists both (any other key is dropped and logged as `<invalid>`, never by name); an older server would drop
 `by_session` the same way. An EA compiled with a 2.6 bridge simply sends neither.
+
+## Vault: encrypted control.json / latest.json (bridge 2.8)
+
+`#define ZGB_HAS_VAULT` marks the 2.8 API. The repository encrypts its files with ZV2 (`scripts/vault.py`, scheme in
+`docs/workflows.md`); bridge 2.8 reads the two files the EA needs once they are encrypted (vault phase 2).
+
+* **Key file, no input.** The key is the first line of `MQL5\Files\zumi_vault.key` (or `Common\Files` with
+  `InpGhUseCommonFiles`), read like the token file: 64 hex characters, the same value as the repo secret `ZUMI_KEY`.
+  It is never an input, so it does not end up in `.set` files, chart templates or tester logs. No file means plaintext
+  files only, exactly the 2.7 behaviour. The bridge still has 41 `input` lines (38 parameters + 3 groups); with
+  EA161's 979 that is 1020 of MT5's 1024.
+* **Init.** `ZGB_VaultInit()` (called from `ZGB_Init`) reads the key file and runs `ZGB_VaultSelfTest()`:
+  * the RFC 4231 HMAC vector;
+  * the three ZV2 known-answer vectors of the `ZGB_VAULT_KAT` block (dummy key);
+  * a tampered blob and a swapped path, which must both be rejected.
+
+  Log line: `ZumiGitHubBridge vault: key fp 1a2b3c4d, self-test OK`. The fingerprint is `HMAC(K, "fp")[:4]` and must
+  equal `vault.key_fp` / `python scripts/vault.py doctor`. The key is never printed, cached or sent. A malformed key
+  or a failed self-test disables the vault: plaintext only, and NEUTRAL once only `.zv` files exist.
+* **Fetch order.** With a valid key, `ZGB_ReadControl` and `ZGB_FetchLatest` first request `<path>.zv`
+  (`control/control.json.zv`, `data/latest.json.zv`). Before the latch, HTTP 404 means "not encrypted yet" (phase 1).
+  The plaintext path is then fetched on the next timer call (still one request per call), and the next scheduled read
+  tries `.zv` again. In phase 1 a read costs two requests.
+* **Verify, then decrypt.** `ZGB_VaultDecrypt(path, text, out)` checks the 32-byte tag in constant time before
+  decrypting, then re-derives the nonce; `path` is the plaintext path (`InpGhControlPath`, `InpGhLatestPath`). On any
+  failure (wrong key, tampered or swapped file, a plaintext body) the result is the same as for an invalid file: the
+  control channel goes **NEUTRAL** (`ZGB_CtlClear`) and `latest.json` becomes "no data".
+* **Latch (downgrade protection).** The first successful decryption of a `.zv` writes the file `zgb_vault_latch` in
+  `MQL5\Files`, with a line `control` / `latest`. After that, for that file:
+  * a 404 on the `.zv` means NEUTRAL / no data;
+  * a plaintext copy is never fetched;
+  * a missing or invalid key file also means NEUTRAL / no data, and the local caches are not loaded at init.
+
+  Delete `zgb_vault_latch` by hand only to roll the repository back to plaintext on purpose.
+* **Functions:**
+  * `ZGB_HmacSha256(key[], msg[], out[])`: a manual HMAC on `CryptEncode(CRYPT_HASH_SHA256)`;
+  * `ZGB_VaultOpen` (bytes) and `ZGB_VaultDecrypt` (string);
+  * helpers `ZGB_B64UrlDecode`, `ZGB_HexBytes`, `ZGB_BytesU16`, `ZGB_VaultFp`;
+  * latch: `ZGB_VaultLatchLoad`, `ZGB_VaultLatchSet`.
+* The local cache files (`zumi_gh_control.json`, `zumi_gh_latest.json`) keep the decrypted text on the user's PC, as
+  before. Reports to GitHub are unchanged: they are aggregates, and the server encrypts the stored files.
+
+Compile watch points for 2.8:
+
+* **No `ArrayInitialize` / `ArrayCopy`.** `ArrayInitialize` is not used on `uchar` arrays and `ArrayCopy` is not used
+  at all (explicit loops, no `WHOLE_ARRAY`). Check that `CryptEncode(CRYPT_HASH_SHA256, data, nokey, out)` accepts the
+  `const uchar &data[]` parameter of `ZGB_Sha256`.
+* **`StringSetCharacter`.** In the self-test it needs a non-const `string` copy (`string bad = ZGB_KAT_Z1;`).
+* **Casts.** Implicit `int` to `uchar` conversions are cast explicitly (`(uchar)(k0[i] ^ 0x36)`,
+  `ZGB_BytesU16`). Report any "possible loss of data" warning.
+* **Key file read.** It uses `FileOpen(..., FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | ZGB_FileFlags())`
+  like the token. Save `zumi_vault.key` as plain ASCII (no BOM), one line.
+* **Name clashes.** The new names must not clash with EA161: look for "function already defined".
+  * functions: `ZGB_Sha256`, `ZGB_HmacSha256`, `ZGB_StrBytes`, `ZGB_BytesCat`, `ZGB_BytesU16`, `ZGB_BytesHex`,
+    `ZGB_HexVal`, `ZGB_HexBytes`, `ZGB_B64Val`, `ZGB_B64UrlDecode`, `ZGB_Vault*`;
+  * globals: `g_zgbVault*`, `g_zgbLatZv`, `g_zgbCtlZv`, `g_zgbLatch*`;
+  * macros: `ZGB_KAT_*`, `ZGB_VAULT_*`.
+* **Demo check.** After compiling, put the key file on a demo terminal. The log must show `self-test OK` and the
+  doctor's fingerprint. `SELF-TEST FAILED` means the MQL5 port differs from `vault.py`: report it and do not start
+  phase 2.
 
 ## Not compiled here
 

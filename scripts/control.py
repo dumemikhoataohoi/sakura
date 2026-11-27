@@ -32,7 +32,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from zumi_common import dumps_pretty, iso_z, mask_secrets, parse_utc, repo_root, utc_now, write_text_atomic  # noqa: E402
+import vault  # noqa: E402
+from zumi_common import dumps_pretty, iso_z, mask_secrets, parse_utc, repo_root, utc_now  # noqa: E402
 
 VERSION = 1
 CONTROL_PATH = "control/control.json"
@@ -352,18 +353,32 @@ def changelog_line(prev: dict | None, new: dict, now: dt.datetime) -> str:
 
 # ---------------------------------------------------------------- I/O helpers
 def load_json(path: Path):
-    return json.loads(path.read_text(encoding="utf-8"))
+    """control.json or control.json.zv (vault phase 2); vault.VaultError without a valid ZUMI_KEY."""
+    return json.loads(vault.read_text(path))
+
+
+def _git_show(root: Path, ref: str, path: str) -> str | None:
+    try:
+        return subprocess.run(["git", "show", f"{ref}:{path}"], cwd=root, capture_output=True,
+                              text=True, check=True).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
 
 
 def prev_from_git(root: Path, ref: str) -> dict | None:
     if not ref or set(ref) == {"0"}:
         return None
+    text = _git_show(root, ref, CONTROL_PATH + vault.SUFFIX)          # phase 2: the previous file may be encrypted
+    if text is not None:
+        text = vault.decrypt(CONTROL_PATH, text).decode("utf-8")     # VaultError propagates: never skip the seq check
+    else:
+        text = _git_show(root, ref, CONTROL_PATH)
+    if text is None:
+        return None
     try:
-        text = subprocess.run(["git", "show", f"{ref}:{CONTROL_PATH}"], cwd=root, capture_output=True,
-                              text=True, check=True).stdout
         norm, _, _ = normalize(json.loads(text))
         return norm
-    except (subprocess.CalledProcessError, json.JSONDecodeError, FileNotFoundError):
+    except json.JSONDecodeError:
         return None
 
 
@@ -383,19 +398,20 @@ def cmd_normalize(root: Path, now: dt.datetime, prev_ref: str) -> int:
     prev = prev_from_git(root, prev_ref)
     if norm:
         errors += check_seq(prev, norm)
-    for w in warnings:
-        print(f"warning: {w}")
+    for w in warnings:   # public in Actions: generic there while the vault guards the repo (phase 2 values)
+        print(vault.public_log(root, f"warning: {w}", "warning: control.json (details redacted)"))
     if errors:
         for e in errors:
-            print(f"error: {e}", file=sys.stderr)
+            print(vault.public_log(root, f"error: {e}", "error: control.json invalid (details redacted)"), file=sys.stderr)
         return 1
-    write_text_atomic(path, dumps_pretty(norm))
+    vault.write_text(path, dumps_pretty(norm), root)        # plaintext in phase 1 (bridge 2.3 reads it), .zv in phase 2
     ch = changes(prev, norm)
     if prev is None or ch or prev["seq"] != norm["seq"]:
         log = root / CHANGELOG_PATH
-        text = log.read_text(encoding="utf-8") if log.exists() else "# Control changelog\n\n"
-        write_text_atomic(log, text.rstrip("\n") + "\n" + changelog_line(prev, norm, now) + "\n")
-    print("normalized control.json, seq", norm["seq"], "|", "; ".join(ch) or "no directive change")
+        text = vault.read_text(log, root) if vault.exists(log, root) else "# Control changelog\n\n"
+        vault.write_text(log, text.rstrip("\n") + "\n" + changelog_line(prev, norm, now) + "\n", root)
+    line = f"normalized control.json, seq {norm['seq']} | " + ("; ".join(ch) or "no directive change")
+    print(vault.public_log(root, line, f"normalized control.json, seq {norm['seq']}"))
     return 0
 
 
@@ -411,13 +427,15 @@ def cmd_check(root: Path, now: dt.datetime, prev_ref: str, alert: bool) -> int:
                 errors.append("file is not normalized: run `python scripts/control.py normalize` before committing")
     except (OSError, json.JSONDecodeError) as exc:
         errors = [f"cannot read {CONTROL_PATH}: {exc}"]
-    for w in warnings:
-        print(f"warning: {w}")
+    except vault.VaultError as exc:
+        errors = [f"cannot decrypt {CONTROL_PATH}: {exc}"]
+    for w in warnings:   # public in Actions: generic there while the vault guards the repo (phase 2 values)
+        print(vault.public_log(root, f"warning: {w}", "warning: control.json (details redacted)"))
     if not errors:
         print("control.json valid")
         return 0
     for e in errors:
-        print(f"error: {e}", file=sys.stderr)
+        print(vault.public_log(root, f"error: {e}", "error: control.json invalid (details redacted)"), file=sys.stderr)
     if alert:
         post_invalid_alert(root, now, errors)
     return 1
@@ -436,7 +454,10 @@ def post_invalid_alert(root: Path, now: dt.datetime, errors: list[str]) -> None:
     al = alerts.alert(f"control_invalid:{sha or now.date()}", "high",
                       f"control.json KHÔNG hợp lệ (EA dùng trạng thái TRUNG TÍNH): {msg}",
                       f"control.json is INVALID (the EA falls back to NEUTRAL): {msg}")
-    alerts.post_alerts(GitHub(token, repo), load_config(root), [al], now, os.environ.get("DEFAULT_BRANCH", "main"))
+    try:   # vault on: the comment carries only an id, the severity and a ZV2 blob
+        alerts.post_alerts(GitHub(token, repo), load_config(root), [al], now, os.environ.get("DEFAULT_BRANCH", "main"))
+    except vault.VaultError as exc:
+        print(f"error: vault: {exc} (alert not posted)", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -450,13 +471,20 @@ def main(argv: list[str] | None = None) -> int:
     root = repo_root(args.root)
     now = parse_utc(args.now) if args.now else utc_now()
     if args.command == "normalize":
-        return cmd_normalize(root, now, args.prev_ref)
+        try:
+            return cmd_normalize(root, now, args.prev_ref)
+        except vault.VaultError as exc:
+            print(f"error: vault: {exc}", file=sys.stderr)
+            return 1
     if args.command == "check":
         return cmd_check(root, now, args.prev_ref, args.alert_on_fail)
     try:
         norm, errors, _ = normalize(load_json(root / CONTROL_PATH), now)
     except (OSError, json.JSONDecodeError):
         norm, errors = None, ["unreadable"]
+    except vault.VaultError as exc:
+        print(f"error: vault: {exc}", file=sys.stderr)
+        return 1
     out = effective(norm, now)
     if errors:
         out["errors"] = errors

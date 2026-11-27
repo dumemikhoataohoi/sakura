@@ -119,7 +119,15 @@ function renderDetail(a) {   // private repositories in detail mode only
   table(document.getElementById("daily"), ["day", "trades", "R", "P/L %"],
     days.map(([d, x]) => [d, String(x.n), { t: fmt(x.r, 2, true), cls: cls(x.r) }, { t: fmt(x.pl_pct, 3, true), cls: cls(x.pl_pct) }]));
 }
-fetch("data.json", { cache: "no-store" }).then(r => r.json()).then(data => {
+// Vault (scripts/vault.py): with the repository vault on, the data is stored encrypted as data.json.zv ("ZV2:..."),
+// which this public page cannot read. It then shows a plain notice; read the data with
+// `python scripts/vault.py cat docs/dashboard/data.json` (needs ZUMI_KEY).
+const ENCRYPTED = "ENCRYPTED";
+const getText = url => fetch(url, { cache: "no-store" }).then(r => r.ok ? r.text() : Promise.reject(new Error(String(r.status))));
+getText("data.json").catch(() => getText("data.json.zv")).then(text => {
+  if (text.trim().startsWith("ZV2:")) throw new Error(ENCRYPTED);
+  return JSON.parse(text);
+}).then(data => {
   const sel = document.getElementById("acct");
   const agg = data.aggregates || {}, det = data.accounts || {};
   const accts = [...new Set(Object.keys(agg).concat(Object.keys(det)))].sort();
@@ -128,7 +136,11 @@ fetch("data.json", { cache: "no-store" }).then(r => r.json()).then(data => {
   const show = k => agg[k] ? renderAgg(agg[k]) : renderDetail(det[k]);
   sel.addEventListener("change", () => show(sel.value));
   show(accts[0]);
-}).catch(() => { document.getElementById("cards").textContent = "data.json not found (no EA reports yet)."; });
+}).catch(err => {
+  document.getElementById("cards").textContent = err && err.message === ENCRYPTED
+    ? "dữ liệu đã mã hóa – xem bằng vault.py (data encrypted: python scripts/vault.py cat docs/dashboard/data.json)"
+    : "data.json not found (no EA reports yet).";
+});
 </script>
 </body>
 </html>

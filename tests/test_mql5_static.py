@@ -283,13 +283,160 @@ class Mql5StaticTest(unittest.TestCase):
         self.assertIn("ps[n].phase = g_zgbXPh[xi];", lp)                     # the phase stays the EA's own label
 
     def test_inputs_unchanged_and_short(self):
-        # 2.7 adds no input (the EA is at 1020 of 1024 inputs with the bridge's 41); string inputs <= 255 characters
+        # 2.7 / 2.8 add no input (EA 979 + bridge 41 = 1020 of 1024; the 2.8 vault key comes from a FILE, never an input,
+        # so it is not saved in .set files, templates or tester logs); string inputs <= 255 characters
         self.assertEqual(len(re.findall(r"^input\s", self.mqh, re.M)), 41)    # 38 parameters + 3 "input group" lines
         inputs = re.findall(r"^input\s+(\w+)\s+(\w+)\s*=\s*(.*?);", self.mqh, re.M)
         self.assertEqual(len(inputs), 38)
+        self.assertNotRegex(self.mqh, r"(?im)^input\s+\w+\s+\w*(Vault|ZumiKey)\w*")
         for typ, name, value in inputs:
             if typ == "string":
                 self.assertLessEqual(len(value.strip().strip('"')), 255, name)
+
+    # ------------------------------------------------------------ bridge 2.8: vault (ZV2)
+    def kat_block(self) -> dict:
+        start = self.mqh.index("// ZGB_VAULT_KAT_BEGIN")
+        end = self.mqh.index("// ZGB_VAULT_KAT_END")
+        out = {}
+        for line in self.mqh[start:end].splitlines()[1:]:
+            m = re.match(r"^//\s+([\w.]+) =\s?(.*)$", line)
+            if m:
+                out[m.group(1)] = m.group(2).strip()
+        return out
+
+    def test_vault_kat_block_matches_vault_py(self):
+        # the comment block duplicates scripts/vault.py's ZV2 known-answer vectors; the ZGB_KAT_* constants the EA's
+        # self-test uses must be the same values
+        import vault
+        v, blk = vault.kat_vectors(), self.kat_block()
+        for k in ("key", "ke", "km", "fp", "rfc4231"):
+            self.assertEqual(blk[k], v[k], k)
+        self.assertEqual(len(v["cases"]), 3)
+        defines = dict(re.findall(r'^#define (ZGB_KAT_\w+)\s+"([^"]*)"', self.mqh, re.M))
+        self.assertEqual(defines["ZGB_KAT_KEY"], v["key"])
+        self.assertEqual(defines["ZGB_KAT_FP"], v["fp"])
+        self.assertEqual(defines["ZGB_KAT_RFC4231"], v["rfc4231"])
+        key = bytes.fromhex(v["key"])
+        for i, case in enumerate(v["cases"], 1):
+            for f, d in (("path", "P"), ("pt_hex", "T"), ("zv", "Z")):
+                self.assertEqual(blk[f"case{i}.{f}"], case[f], f"case{i}.{f}")
+                self.assertEqual(defines[f"ZGB_KAT_{d}{i}"], case[f], f"ZGB_KAT_{d}{i}")
+            self.assertEqual(vault.decrypt(case["path"], case["zv"], key).hex(), case["pt_hex"])
+        self.assertGreater(len(v["cases"][2]["pt_hex"]) // 2, 64)          # a 3-block keystream is exercised
+
+    def test_vault_b64url_decoder_emulation(self):
+        # emulate ZGB_B64Val / ZGB_B64UrlDecode on every KAT blob and compare with Python's base64
+        import base64
+
+        import vault
+        body = self._body("bool ZGB_B64UrlDecode(const string s, uchar &out[])")
+        self.assertIn("acc = ((acc << 6) | v) & 0xFFFFFF;", body)
+        self.assertIn("if(v < 0) { ArrayResize(out, 0); return(false); }", body)
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+        def val(c):
+            return alphabet.index(c) if c in alphabet else 62 if c in "-+" else 63 if c in "_/" else -1
+
+        def decode(s):
+            acc = bits = 0
+            out = bytearray()
+            for c in s:
+                if c == "=":
+                    break
+                v = val(c)
+                if v < 0:
+                    return None
+                acc = ((acc << 6) | v) & 0xFFFFFF
+                bits += 6
+                if bits >= 8:
+                    bits -= 8
+                    out.append((acc >> bits) & 0xFF)
+            return bytes(out)
+        for case in vault.kat_vectors()["cases"]:
+            s = case["zv"][4:]
+            self.assertEqual(decode(s), base64.urlsafe_b64decode(s + "=" * (-len(s) % 4)))
+        self.assertIsNone(decode("ab*c"))
+
+    def test_vault_bridge_28(self):
+        self.assertRegex(self.mqh, r'#define ZGB_VERSION "2\.(?:[8-9]|\d\d)"')
+        self.assertIn("#define ZGB_HAS_VAULT", self.mqh)
+        self.assertNotIn("InpGhVaultKey", self.mqh)                         # the key is a file, never an input
+        self.assertIn('#define ZGB_VAULT_KEY_FILE   "zumi_vault.key"', self.mqh)
+        self.assertIn('#define ZGB_VAULT_LATCH_FILE "zgb_vault_latch"', self.mqh)
+        for sig in ("bool ZGB_HmacSha256(const uchar &key[], const uchar &msg[], uchar &out[])",
+                    "bool ZGB_VaultDecrypt(const string path, const string text, string &out)",
+                    "bool ZGB_VaultOpen(const uchar &k[], const string path, const string text, uchar &pt[])",
+                    "bool ZGB_VaultSelfTest(void)", "void ZGB_VaultInit(void)", "void ZGB_VaultLatchSet(const bool ctl)",
+                    "void ZGB_VaultLatchLoad(void)"):
+            self.assertIn(sig, self.mqh)
+        hm = self._body("bool ZGB_HmacSha256(")
+        for s in ("CryptEncode(CRYPT_HASH_SHA256", "^ 0x36", "^ 0x5c", "ArrayResize(k0, 64);"):
+            self.assertIn(s, hm + self._body("bool ZGB_Sha256("))
+        op = self._body("bool ZGB_VaultOpen(")
+        for lab in ('"zumi-enc-v1"', '"zumi-mac-v1"', '"tag"', '"nonce"', '"ZV2:"'):
+            self.assertIn(lab, op)
+        self.assertNotIn('"ZV1:"', self.mqh)
+        # ZV2: the path is length-prefixed (u16be) in both the tag and the nonce
+        tag = op[op.index('ZGB_StrBytes("tag", m);'):op.index("if(!ZGB_HmacSha256(km, m, mac)) return(false);")]
+        self.assertEqual([x.strip() for x in tag.splitlines()[1:] if x.strip()],
+                         ["ZGB_BytesCat(m, blob, 0, 16);", "ZGB_BytesU16(m, pn);", "ZGB_BytesCat(m, p, 0, pn);",
+                          "ZGB_BytesCat(m, blob, 48, n);"])
+        nonce = op[op.index('ZGB_StrBytes("nonce", m);'):]
+        self.assertLess(nonce.index("ZGB_BytesU16(m, pn);"), nonce.index("ZGB_BytesCat(m, p, 0, pn);"))
+        self.assertIn("if(pn > 65535) return(false);", op)
+        u16 = self._body("void ZGB_BytesU16(uchar &dst[], const int v)")
+        self.assertIn("dst[n] = (uchar)((v >> 8) & 0xFF);", u16)            # big endian
+        self.assertIn("dst[n + 1] = (uchar)(v & 0xFF);", u16)
+        self.assertIn("diff |= ((int)mac[i] ^ (int)blob[16 + i]);", op)      # constant-time tag compare
+        self.assertLess(op.index("if(diff != 0) return(false);"), op.index("ArrayResize(pt, n);"))   # tag before decrypt
+        self.assertIn("int n = ArraySize(blob) - 48;", op)                  # N(16) || tag(32) || ct
+        init = self._body("void ZGB_VaultInit(void)")
+        self.assertIn("ZGB_VaultSelfTest()", init)
+        self.assertIn("StringLen(ktxt) != 64", init)
+        self.assertIn("FileOpen(ZGB_VAULT_KEY_FILE, FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | ZGB_FileFlags())", init)
+        self.assertIn("ZGB_VaultLatchLoad();", init)
+        zinit = self._body("bool ZGB_Init(void)")
+        self.assertIn("ZGB_VaultInit();", zinit)
+        self.assertIn("if(g_zgbLatchCtl && !g_zgbVaultOk) ZGB_CtlClear();", zinit)      # no cached control without key
+        self.assertIn("if(!(g_zgbLatchLat && !g_zgbVaultOk)) ZGB_ReadFile(ZGB_CACHE_FILE, g_zgbLatest);", zinit)
+        st = self._body("bool ZGB_VaultSelfTest(void)")
+        for i in (1, 2, 3):
+            self.assertIn(f"ZGB_VaultOpen(k, ZGB_KAT_P{i}, ZGB_KAT_Z{i}, pt) || ZGB_BytesHex(pt) != ZGB_KAT_T{i}", st)
+        self.assertIn("ZGB_KAT_RFC4231", st)
+        # control: .zv first; 404 -> plaintext next call ONLY before the latch; bad tag -> NEUTRAL; success sets the latch
+        rc = self._body("bool ZGB_ReadControl(")
+        self.assertIn("if(g_zgbLatchCtl && !g_zgbVaultOk && now >= g_zgbCtlNextRead)", rc)
+        self.assertIn("bool zv = g_zgbCtlZv || g_zgbLatchCtl;", rc)
+        self.assertIn("InpGhControlPath + (zv ? ZGB_VAULT_SUFFIX : \"\")", rc)
+        self.assertIn("if(code != -2 && zv && code == 404 && !g_zgbLatchCtl)", rc)
+        self.assertIn("{ body = plain; ZGB_VaultLatchSet(true); }", rc)
+        tamper = rc[rc.index("ZGB_VaultDecrypt(InpGhControlPath"):rc.index("if(code == 200)\n")]
+        self.assertIn("ZGB_CtlClear();", tamper)
+        self.assertIn("code = 0;", tamper)
+        self.assertIn("else if(code == 404)", rc)                          # a missing .zv after the latch -> NEUTRAL
+        self.assertIn("ZGB_CtlClear();", rc[rc.index("else if(code == 404)"):])
+        # latest.json: same order; bad tag or latched 404 -> no data
+        fl = self._body("bool ZGB_FetchLatest(void)")
+        self.assertIn("if(g_zgbLatchLat && !g_zgbVaultOk)", fl)
+        self.assertIn("bool zv = g_zgbLatZv || g_zgbLatchLat;", fl)
+        self.assertIn("InpGhLatestPath + (zv ? ZGB_VAULT_SUFFIX : \"\")", fl)
+        self.assertIn("ZGB_VaultDecrypt(InpGhLatestPath, body, plain)", fl)
+        self.assertIn("{ body = plain; ZGB_VaultLatchSet(false); }", fl)
+        self.assertIn("if(code == 404 && g_zgbLatchLat)", fl)
+        self.assertLess(fl.index("if(code == 404 && g_zgbLatchLat)"), fl.index("g_zgbLatZv = false;"))
+        self.assertIn('g_zgbLatest = "";', fl)
+        # the key is never printed, logged, cached or sent: only its fingerprint
+        code = strip_code(self.mqh)
+        for m in re.finditer(r"\b(?:Print|PrintFormat|Alert|Comment|ZGB_WriteFile|ZGB_Flag|ZGB_Log)\s*\(", code):
+            i, depth = m.end(), 1
+            while depth:
+                depth += {"(": 1, ")": -1}.get(code[i], 0)
+                i += 1
+            call = code[m.end():i - 1]
+            for secret in ("ktxt", "ZGB_VAULT_KEY_FILE"):
+                self.assertNotIn(secret, call)
+            self.assertNotIn("g_zgbVaultKey", call.replace("ZGB_VaultFp(g_zgbVaultKey)", ""))
+        self.assertEqual(len(re.findall(r"\bZGB_VAULT_KEY_FILE\b", code)), 3)  # define + FileIsExist + FileOpen
 
     def test_phase_key_matches_server(self):
         # emulate ZGB_PhaseKey and compare with agg._phase_key on the EA labels and odd input

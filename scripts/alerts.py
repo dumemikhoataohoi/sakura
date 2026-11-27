@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calendar_events  # noqa: E402
 import journal_stats as js  # noqa: E402
 import reports_lib as rl  # noqa: E402
+import vault  # noqa: E402
 from zumi_common import UTC, iso_z, load_config, mask_secrets, parse_utc, repo_root, utc_now  # noqa: E402
 
 KEY_RE = re.compile(r"<!-- zumi-alert-key: (\S+) -->")
@@ -38,8 +39,9 @@ def alert(key: str, level: str, vi: str, en: str) -> dict:
 
 
 def _load_json(path: Path) -> dict | None:
+    """Missing / invalid -> None; an encrypted file without a valid ZUMI_KEY raises vault.VaultError (never 'empty')."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(vault.read_text(path))
     except (OSError, json.JSONDecodeError):
         return None
 
@@ -218,15 +220,51 @@ def evaluate(root: Path, cfg: dict, now: dt.datetime) -> list[dict]:
     return out
 
 
-def render_comment(alerts: list[dict], now: dt.datetime) -> str:
+def render_comments(alerts: list[dict], now: dt.datetime, redact: bool = False, key: bytes | None = None,
+                    limit: int = MAX_COMMENT) -> list[str]:
+    """PR comment bodies, each <= ``limit`` characters; several parts ("part i/n") when the alerts do not fit in one.
+    Every alert is in exactly one part together with its de-duplication marker, so nothing is cut and nothing is
+    posted again on the next run. With ``redact`` (vault on: the PR is public) an alert is only its opaque id, its
+    severity and a ZV2 blob of {key, level, vi, en}; Claude reads it with `python scripts/vault.py alerts < comment.txt`."""
     order = {"high": 0, "medium": 1, "info": 2}
-    lines = [f"**Cảnh báo Zumi / Zumi alert** - {now.strftime('%Y-%m-%d %H:%M')} UTC", ""]
-    for al in sorted(alerts, key=lambda x: order.get(x["level"], 3)):
-        lines.append(f"- **[{al['level'].upper()}]** {al['vi']}  \n  EN: {al['en']}")
-    lines.append("")
-    lines += [f"<!-- zumi-alert-key: {al['key']} -->" for al in alerts]
-    body = "\n".join(lines)
-    return body[:MAX_COMMENT]
+    ordered = sorted(alerts, key=lambda x: order.get(x["level"], 3))
+    stamp = now.strftime('%Y-%m-%d %H:%M')
+    if redact:
+        k = vault.load_key() if key is None else key
+        title = f"**Cảnh báo Zumi (mã hoá) / Zumi alert (encrypted)** - {stamp} UTC"
+        intro = ["`python scripts/vault.py alerts < comment.txt` (ZUMI_KEY)", ""]
+        items = []
+        for al in ordered:
+            aid = vault.alert_id(al["key"], k)
+            body = json.dumps({"key": al["key"], "level": al["level"], "vi": al["vi"], "en": al["en"]},
+                              ensure_ascii=False, sort_keys=True).encode("utf-8")
+            items.append((f"- **[{al['level'].upper()}]** `{aid}` {vault.encrypt(f'alerts/{aid}', body, k)}",
+                          f"<!-- zumi-alert-key: {aid} -->"))
+    else:
+        title, intro = f"**Cảnh báo Zumi / Zumi alert** - {stamp} UTC", []
+        items = [(f"- **[{al['level'].upper()}]** {al['vi']}  \n  EN: {al['en']}", f"<!-- zumi-alert-key: {al['key']} -->")
+                 for al in ordered]
+    head_room = len(title) + 16 + sum(len(x) + 1 for x in intro) + 2   # " (part 99/99)" + intro + blank lines
+    parts: list[list[tuple[str, str]]] = [[]]
+    size = head_room
+    for line, marker in items:
+        need = len(line) + len(marker) + 2
+        if parts[-1] and size + need > limit:
+            parts.append([])
+            size = head_room
+        parts[-1].append((line, marker))
+        size += need
+    bodies = []
+    for i, part in enumerate(parts, 1):
+        head = title + (f" (part {i}/{len(parts)})" if len(parts) > 1 else "")
+        lines = [head, ""] + intro + [ln for ln, _ in part] + [""] + [m for _, m in part]
+        bodies.append("\n".join(lines))
+    return bodies
+
+
+def render_comment(alerts: list[dict], now: dt.datetime, redact: bool = False, key: bytes | None = None) -> str:
+    """All parts of render_comments joined (dry run / tests); a single part when everything fits."""
+    return "\n\n---\n\n".join(render_comments(alerts, now, redact, key))
 
 
 def existing_keys(bodies: list[str]) -> set[str]:
@@ -266,13 +304,29 @@ def ensure_pr(gh, cfg: dict, base: str) -> int:
     return number
 
 
-def post_alerts(gh, cfg: dict, alerts: list[dict], now: dt.datetime, base: str) -> tuple[int, int]:
-    """Ensure the alerts PR exists, then post one comment with the alerts not posted before."""
+def post_alerts(gh, cfg: dict, alerts: list[dict], now: dt.datetime, base: str,
+                redact: bool | None = None) -> tuple[int, int]:
+    """Ensure the alerts PR exists, then post the alerts not posted before (one comment, or numbered parts when they
+    do not fit). Returns (PR number, number of alerts posted). ``redact`` defaults to the vault being active."""
     number = ensure_pr(gh, cfg, base)
     known = existing_keys(gh.comment_bodies(number))
+    if vault.enabled(cfg) if redact is None else redact:
+        # The PR is public: post ids + severity + ZV2 blobs only; de-duplicate on the opaque ids.
+        try:
+            key = vault.load_key()
+        except vault.VaultError:
+            nokey = f"vault_nokey:{now.date()}"
+            if nokey not in known:   # carries no data: tells the user why no alert text can be posted
+                gh.comment(number, f"- **[HIGH]** `vault_nokey` ZUMI_KEY missing or invalid in Actions: alerts cannot "
+                                   f"be encrypted, none were posted.\n\n<!-- zumi-alert-key: {nokey} -->")
+            raise
+        new = [a for a in alerts if vault.alert_id(a["key"], key) not in known]
+        for body in render_comments(new, now, redact=True, key=key) if new else []:
+            gh.comment(number, body)
+        return number, len(new)
     new = [a for a in alerts if a["key"] not in known]
-    if new:
-        gh.comment(number, render_comment(new, now))
+    for body in render_comments(new, now) if new else []:
+        gh.comment(number, body)
     return number, len(new)
 
 
@@ -285,13 +339,24 @@ def main(argv: list[str] | None = None) -> int:
     root = repo_root(args.root)
     now = parse_utc(args.now) if args.now else utc_now()
     cfg = load_config(root)
-    alerts = evaluate(root, cfg, now)
-    print(f"{len(alerts)} alert(s) detected: {', '.join(a['key'] for a in alerts) or '-'}")
+    redact = vault.guarded(root)   # vault active, or any .zv in the repository
+    try:
+        alerts = evaluate(root, cfg, now)
+    except vault.VaultError as exc:
+        print(f"error: vault: {exc}", file=sys.stderr)   # fail closed: never evaluate encrypted files as empty
+        return 1
+    line = f"{len(alerts)} alert(s) detected: {', '.join(a['key'] for a in alerts) or '-'}"
+    print(vault.public_log(root, line, f"{len(alerts)} alert(s) detected"))
     dry = args.dry_run or os.environ.get("DRY_RUN", "").lower() == "true"
     if not alerts:
         return 0
     if dry:
-        print(render_comment(alerts, now))
+        in_actions = os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+        try:
+            print(render_comment(alerts, now, redact=redact and in_actions))   # Actions logs are public
+        except vault.VaultError as exc:
+            print(f"error: vault: {exc}", file=sys.stderr)
+            return 1
         return 0
     token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
     if not token or not repo:
@@ -300,8 +365,11 @@ def main(argv: list[str] | None = None) -> int:
     from gh_api import GitHub, GitHubError
     gh = GitHub(token, repo)
     try:
-        number, posted = post_alerts(gh, cfg, alerts, now, os.environ.get("DEFAULT_BRANCH", "main"))
+        number, posted = post_alerts(gh, cfg, alerts, now, os.environ.get("DEFAULT_BRANCH", "main"), redact)
         print(f"posted {posted} new alert(s) on PR #{number}" if posted else f"all alerts already posted on PR #{number}")
+    except vault.VaultError as exc:
+        print(f"error: vault: {exc}", file=sys.stderr)
+        return 1
     except GitHubError as exc:
         print(f"error: {exc}", file=sys.stderr)
         if exc.status == 403:

@@ -6,6 +6,24 @@ context for the EA, stores the EA's trade/analysis reports, renders journal anal
 Read first: `docs/agents.md` (multi-agent roles), `docs/architecture.md` (data flow), `docs/data-dictionary.md` (every file and field),
 `docs/workflows.md` (triggers, permissions, alerts PR), `docs/mql5-bridge.md` (EA side).
 
+## Encrypted files (vault)
+
+The repo is public, but files selected by `config/settings.json` > `vault` are stored encrypted as `<name>.zv`
+(ZV2: HMAC-SHA256 stream cipher + 32-byte tag, `scripts/vault.py`). Summary, since the docs themselves are encrypted:
+
+1. Phase 1: `reports/**`, `docs/**`, `control/CHANGELOG.md`, `data/calendar/**`, `data/quality.json` (never this file).
+2. Phase 2, only once every live EA runs bridge 2.8 with its key file: `control/control.json`, `data/latest.json`.
+3. `ZUMI_KEY` (64 hex, set by the user) must be in the environment; without it every reader stops with an error, and
+   a plaintext copy of an encrypted file is refused. A `.zv` is never written back as plaintext (only `vault.py dec`).
+4. Read any file with `python scripts/vault.py cat <file>` (e.g. `docs/workflows.md`); alerts PR comments carry only
+   `id + severity + ZV2 blob`: `python scripts/vault.py alerts < comment.txt`. Check with `python scripts/vault.py doctor`.
+5. Never print, log or commit the key (doctor shows only its fingerprint); while the vault is on, use generic commit
+   messages (`reports: update`, `coord: update`, `control: update`): they stay public, as do file names and history.
+
+Scripts read and write through `vault.read_text` / `vault.write_text`, so the routine below works unchanged once
+`ZUMI_KEY` is set; to read a page yourself, use `vault.py cat` instead of opening the file. Edit an encrypted file by
+hand (e.g. the calendar) with `vault.py dec --yes-plaintext <file>`, edit, then `vault.py enc <file>` before any commit.
+
 ## Daily analysis routine (Claude)
 
 0. Read `docs/user-requirements.md` and, for any EA research/upgrade, follow `docs/research-protocol.md` step by step.
@@ -32,7 +50,8 @@ Read first: `docs/agents.md` (multi-agent roles), `docs/architecture.md` (data f
    2. Check `python scripts/control.py effective` (what the EA applies now) and `control/CHANGELOG.md`.
    3. Decide. Apply with `python scripts/coordinator_report.py --apply`, or edit `control/control.json` (bump `seq`,
       codes `M###` only, reason codes from `control/reason_codes.md`, no prices in `notes_vi`) and run
-      `python scripts/control.py normalize`. Commit `control/` and `reports/coord/`, pull --rebase, push.
+      `python scripts/control.py normalize`. Commit `control/` and `reports/coord/` (vault on: generic message
+      `coord: update`, no codes or values in it), pull --rebase, push.
    4. Refresh the file at least every 48 h while directives should stay active (expiry), never later than 72 h
       (staleness = NEUTRAL). Boosts only take effect up to the user's local `InpGhMaxRiskMult`.
 7. Write findings for the user. Macro values are context and risk filters only: the macro1 research found no
@@ -43,6 +62,10 @@ Read first: `docs/agents.md` (multi-agent roles), `docs/architecture.md` (data f
 * Python 3, standard library + `requests` only. Keep `python -m unittest discover -s tests` green and offline.
 * Keep outputs deterministic and pretty-printed with sorted keys (small diffs, commit only on change).
 * Keep the `latest.json` schema backward compatible; bump `v` for breaking changes and update the MQL5 parser.
+* Vault: every repo file is read with `vault.read_text` / `vault.exists` / `vault.glob` and written with
+  `vault.write_text` (it encrypts when the config selects the path). A `vault.VaultError` must stop the reader, never
+  be treated as a missing or empty file. Keep `scripts/vault.py`, the MQL5 `ZGB_Vault*` code, its KAT block and
+  `tests/test_vault*.py` / `tests/test_mql5_static.py` in sync. Tests use dummy keys only.
 * Privacy: never write an account number, email, money amount, token or webhook URL to the repo, a log or a commit
   message. Accounts are hashes; money is % of balance. Use `mask_secrets()` for any free text.
 * The repository is PUBLIC: only aggregate (v2) EA reports are accepted (`reports.public_mode: true`). Do not add

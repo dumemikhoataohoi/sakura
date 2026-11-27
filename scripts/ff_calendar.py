@@ -41,13 +41,14 @@ def parse(feed: list, now: dt.datetime) -> dict:
 
 
 def write_if_changed(path: Path, obj: dict) -> bool:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import vault   # ff_week.json.zv in vault phase 1 (data/calendar/**)
     text = json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-    if path.exists():
-        old = json.loads(path.read_text(encoding="utf-8"))
+    if vault.exists(path):
+        old = json.loads(vault.read_text(path))
         if old.get("events") == obj.get("events"):
             return False                                   # same events: no commit noise
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    vault.write_text(path, text)
     return True
 
 

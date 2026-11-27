@@ -29,16 +29,30 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Vault gate, first: fail fast on a missing / wrong key (vault.key_fp), an undecryptable .zv or a vault-set file
+      # left in plaintext. Vault off and no .zv: passes without a key. The key is never printed.
+      - name: Vault check
+        env:
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
+        run: python scripts/vault.py check
+
+      # ZUMI_KEY (repo secret, 64 hex): only on the steps that read / write vault files (scripts/vault.py).
+      # It is passed as env and never echoed; GitHub also masks it in logs. Without vault.enabled it is unused.
       - name: Fetch FRED + calendar (+ optional gold), build data/latest.json
         id: build
+        env:
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
         run: python scripts/build_latest.py --msg-file "$RUNNER_TEMP/commit_msg.txt"
 
       - name: Weekly USD economic calendar (best effort, never fails the job)
+        env:
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
         run: python scripts/ff_calendar.py || true
 
       - name: Commit only when data changed
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}   # the regenerate command (push race) re-runs build_latest.py
         run: |
           bash scripts/commit_push.sh "$RUNNER_TEMP/commit_msg.txt" \
             "python scripts/build_latest.py --msg-file $RUNNER_TEMP/commit_msg.txt" \
@@ -49,6 +63,7 @@ jobs:
       - name: Agent health and daily KPIs (commit only on change)
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}   # reads reports/coord, CHANGELOG, quality; writes reports/agents (vault)
         run: |
           python scripts/agents_status.py --msg-file "$RUNNER_TEMP/agents_msg.txt"
           bash scripts/commit_push.sh "$RUNNER_TEMP/agents_msg.txt" \

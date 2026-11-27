@@ -14,7 +14,8 @@ import math
 import re
 from pathlib import Path
 
-from zumi_common import UTC, dumps_pretty, mask_secrets, write_text_atomic
+import vault
+from zumi_common import UTC, dumps_pretty, mask_secrets
 
 HASH_RE = re.compile(r"^[0-9a-f]{8,64}$")
 FLAG_KEY_RE = re.compile(r"[^a-z0-9_:.-]")
@@ -205,11 +206,10 @@ def store_raw(root: Path, rep: dict) -> Path:
     path = report_path(root, rep)
     text = dumps_pretty(rep)
     n = 2
-    while path.exists() and path.read_text(encoding="utf-8") != text:
+    while vault.exists(path, root) and vault.read_text(path, root) != text:
         path = path.with_name(f"{report_path(root, rep).stem}-{n}.json")
         n += 1
-    if not path.exists():
-        write_text_atomic(path, text)
+    vault.write_text(path, text, root)   # .zv when the vault is on; identical report -> no change on disk
     return path
 
 
@@ -218,16 +218,18 @@ def iter_report_files(root: Path, first: dt.date, last: dt.date):
     while day <= last:
         folder = root / "reports" / day.strftime("%Y/%m/%d")
         if folder.is_dir():
-            for p in sorted(folder.glob("*.json")):
+            for p in vault.glob(folder, "*.json"):   # logical paths: x.json for x.json and x.json.zv
                 yield p
         day += dt.timedelta(days=1)
 
 
 def load_reports(root: Path, first: dt.date, last: dt.date) -> list[dict]:
+    """Raw reports of the days [first, last]. Invalid JSON is skipped; an encrypted file without a valid ZUMI_KEY
+    raises vault.VaultError (never silently treated as 'no reports')."""
     out = []
     for p in iter_report_files(root, first, last):
         try:
-            out.append(json.loads(p.read_text(encoding="utf-8")))
+            out.append(json.loads(vault.read_text(p, root)))
         except (OSError, json.JSONDecodeError):
             continue
     out.sort(key=lambda r: (r.get("ts", 0), r.get("part", 1)))
@@ -242,8 +244,8 @@ def journal_dir(root: Path, acct: str) -> Path:
 def read_deals(root: Path, acct: str) -> dict[int, dict]:
     path = journal_dir(root, acct) / "deals.jsonl"
     deals: dict[int, dict] = {}
-    if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
+    if vault.exists(path, root):
+        for line in vault.read_text(path, root).splitlines():
             if line.strip():
                 d = json.loads(line)
                 deals[int(d["deal"])] = d
@@ -262,7 +264,7 @@ def upsert_deals(root: Path, acct: str, trades: list[dict]) -> bool:
         return False
     ordered = sorted(deals.values(), key=lambda d: (d.get("t_out", 0), d["deal"]))
     text = "".join(json.dumps(d, sort_keys=True, ensure_ascii=True) + "\n" for d in ordered)
-    write_text_atomic(journal_dir(root, acct) / "deals.jsonl", text)
+    vault.write_text(journal_dir(root, acct) / "deals.jsonl", text, root)
     return True
 
 
@@ -330,12 +332,7 @@ def write_positions_csv(root: Path, acct: str, positions: list[dict]) -> bool:
         row = ["" if p.get(c) is None else p.get(c) for c in POSITION_COLUMNS]
         row += [_iso(p.get("t_in")), _iso(p.get("t_out"))]
         w.writerow(row)
-    path = journal_dir(root, acct) / "positions.csv"
-    text = buf.getvalue()
-    if path.exists() and path.read_text(encoding="utf-8") == text:
-        return False
-    write_text_atomic(path, text)
-    return True
+    return vault.write_text(journal_dir(root, acct) / "positions.csv", buf.getvalue(), root)
 
 
 def _iso(ts) -> str:

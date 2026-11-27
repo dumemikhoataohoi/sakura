@@ -50,8 +50,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calendar_events  # noqa: E402
 import control  # noqa: E402
 import reports_lib as rl  # noqa: E402
-from zumi_common import (dumps_pretty, iso_z, load_config, parse_utc, repo_root, utc_now,  # noqa: E402
-                         write_text_atomic)
+import vault  # noqa: E402
+from zumi_common import dumps_pretty, iso_z, load_config, parse_utc, repo_root, utc_now  # noqa: E402
 
 # v2 defaults; config/settings.json > coordinator overrides every key
 V2_DEFAULTS = {
@@ -91,8 +91,9 @@ def coord_cfg(cfg: dict) -> dict:
 
 
 def _load(path: Path):
+    """JSON of a plaintext or .zv file; None when missing / invalid. vault.VaultError propagates (fail clearly)."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(vault.read_text(path))
     except (OSError, json.JSONDecodeError):
         return None
 
@@ -472,7 +473,7 @@ def apply(root: Path, res: dict, now: dt.datetime) -> int:
     raw["global"] = {k: v for k, v in raw["global"].items() if k != "expires_unix"}
     raw["methods"] = {c: {k: v for k, v in d.items() if k != "expires_unix"} for c, d in raw["methods"].items()}
     raw["news_blocks"] = [{k: v for k, v in w.items() if not k.endswith("_unix")} for w in raw["news_blocks"]]
-    write_text_atomic(root / control.CONTROL_PATH, json.dumps(raw, indent=2, ensure_ascii=False) + "\n")
+    vault.write_text(root / control.CONTROL_PATH, json.dumps(raw, indent=2, ensure_ascii=False) + "\n", root)
     return control.cmd_normalize(root, now, "HEAD")
 
 
@@ -484,13 +485,18 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     root = repo_root(args.root)
     now = parse_utc(args.now) if args.now else utc_now()
-    res = evaluate(root, now)
-    day = now.date()
-    out_dir = root / "reports" / "coord"
-    write_text_atomic(out_dir / f"{day.isoformat()}.md", render(res, day))
-    write_text_atomic(out_dir / f"{day.isoformat()}.json", dumps_pretty(
-        {k: res[k] for k in ("as_of", "accounts", "hits", "changes", "restored", "proposal", "errors")}))
-    print(f"wrote reports/coord/{day.isoformat()}.md: {len(res['hits'])} rule hit(s), {len(res['changes'])} change(s)")
+    try:
+        res = evaluate(root, now)
+        day = now.date()
+        out_dir = root / "reports" / "coord"
+        vault.write_text(out_dir / f"{day.isoformat()}.md", render(res, day), root)
+        vault.write_text(out_dir / f"{day.isoformat()}.json", dumps_pretty(
+            {k: res[k] for k in ("as_of", "accounts", "hits", "changes", "restored", "proposal", "errors")}), root)
+    except vault.VaultError as exc:
+        print(f"error: vault: {exc}", file=sys.stderr)
+        return 1
+    line = f"wrote reports/coord/{day.isoformat()}.md: {len(res['hits'])} rule hit(s), {len(res['changes'])} change(s)"
+    print(vault.public_log(root, line, f"wrote reports/coord/{day.isoformat()}.md"))
     if args.apply:
         return apply(root, res, now)
     return 0

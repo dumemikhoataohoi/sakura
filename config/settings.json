@@ -370,5 +370,29 @@
         "min_n": 20
       }
     }
+  },
+  "vault": {
+    "_doc": "ZV2 file encryption (scripts/vault.py, docs/workflows.md). enabled = master switch (needs the repo secret ZUMI_KEY first). key_fp = 8-hex key fingerprint written by migrate; once set the vault stays active (latch) and every check compares the key against it. paths = phase 1 globs; phase2_paths are encrypted only when phase >= 2 AND ea_bridge_min >= 2.8 (bridge 2.3 reads control.json / latest.json in plaintext). Migrate with: python scripts/vault.py migrate --phase 1",
+    "enabled": false,
+    "key_fp": "",
+    "phase": 1,
+    "ea_bridge_min": "2.3",
+    "paths": [
+      "reports/**",
+      "docs/**",
+      "control/CHANGELOG.md",
+      "reports/coord/**",
+      "reports/agents/**",
+      "data/calendar/**",
+      "data/quality.json"
+    ],
+    "phase2_paths": [
+      "control/control.json",
+      "data/latest.json"
+    ],
+    "plain_exceptions": [
+      "docs/dashboard/index.html"
+    ],
+    "generic_commit_messages": true
   }
 }

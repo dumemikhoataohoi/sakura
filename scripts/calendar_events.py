@@ -17,6 +17,7 @@ import datetime as dt
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import vault
 from zumi_common import UTC, iso_z
 
 NY = ZoneInfo("America/New_York")
@@ -24,8 +25,8 @@ NY = ZoneInfo("America/New_York")
 
 def load_events(path: Path) -> list[dict]:
     events: list[dict] = []
-    with open(path, encoding="utf-8") as fh:
-        lines = [ln for ln in fh if ln.strip() and not ln.lstrip().startswith("#")]
+    text = vault.read_text(path)   # events_us.csv or events_us.csv.zv (phase 1); VaultError without the key
+    lines = [ln for ln in text.splitlines(keepends=True) if ln.strip() and not ln.lstrip().startswith("#")]
     reader = csv.DictReader(lines)
     for rec in reader:
         date_s = (rec.get("date") or "").strip()

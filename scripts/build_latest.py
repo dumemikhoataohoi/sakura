@@ -26,8 +26,9 @@ import calendar_events  # noqa: E402
 import fred  # noqa: E402
 import gold  # noqa: E402
 import quality  # noqa: E402
+import vault  # noqa: E402
 from zumi_common import (dumps_pretty, iso_z, load_config, mask_secrets, parse_utc, repo_root,  # noqa: E402
-                         set_github_output, utc_now, write_text_atomic)
+                         set_github_output, utc_now)
 
 SCHEMA = "zumi.latest"
 VERSION = 1
@@ -161,14 +162,15 @@ def build(root: Path, now: dt.datetime, session=None, offline: bool = False) -> 
                        "msg": f"only {len(series_out)} series usable (< {qcfg.get('min_series_ok')})"})
 
     latest_path = root / "data" / "latest.json"
-    old_latest = json.loads(latest_path.read_text(encoding="utf-8")) if latest_path.exists() else None
+    old_latest = json.loads(vault.read_text(latest_path, root)) if vault.exists(latest_path, root) else None
     ok = not quality.has_errors(issues)
     written = False
     message = "data: quality guard tripped, latest.json kept"
     if ok:
         message = change_summary(old_latest, latest)
+        # plaintext unless vault phase 2 is active (EA bridge 2.3 reads latest.json in plaintext)
         if stable_part(old_latest) != stable_part(latest):
-            write_text_atomic(latest_path, dumps_pretty(latest))
+            vault.write_text(latest_path, dumps_pretty(latest), root)
             written = True
     if write_quality(root, now, ok, issues) and not written and ok:
         kinds = sorted({f"{i['sid']}:{i['kind']}" for i in issues}) or ["cleared"]
@@ -180,12 +182,12 @@ def write_quality(root: Path, now: dt.datetime, ok: bool, issues: list[dict]) ->
     """data/quality.json changes only when the set of issues changes (no per-run churn)."""
     path = root / "data" / "quality.json"
     body = {"ok": ok, "issues": sorted(issues, key=lambda i: (i["level"], i["sid"], i["kind"]))}
-    if path.exists():
-        old = json.loads(path.read_text(encoding="utf-8"))
+    if vault.exists(path, root):
+        old = json.loads(vault.read_text(path, root))
         if {"ok": old.get("ok"), "issues": old.get("issues")} == body:
             return False
     body["since_utc"] = iso_z(now)
-    write_text_atomic(path, dumps_pretty(body))
+    vault.write_text(path, dumps_pretty(body), root)   # quality.json.zv in vault phase 1
     return True
 
 
@@ -202,12 +204,18 @@ def main(argv: list[str] | None = None) -> int:
     if not args.offline:
         import requests  # imported lazily so offline runs need only the stdlib
         session = requests.Session()
-    res = build(root, now, session=session, offline=args.offline)
+    try:
+        res = build(root, now, session=session, offline=args.offline)
+    except vault.VaultError as exc:
+        print(f"error: vault: {exc}", file=sys.stderr)   # fail closed: nothing written in plaintext
+        return 1
     for i in res["issues"]:
-        print(f"[{i['level']}] {i['msg']}")
-    print(("written: " if res["written"] else "unchanged: ") + res["message"])
+        print(vault.public_log(root, f"[{i['level']}] {i['msg']}", f"[{i['level']}] {i['sid']}: {i['kind']}"))
+    print(vault.public_log(root, ("written: " if res["written"] else "unchanged: ") + res["message"],
+                           "written" if res["written"] else "unchanged"))
     if args.msg_file:
-        Path(args.msg_file).write_text(mask_secrets(res["message"]) + "\n", encoding="utf-8")
+        msg = vault.commit_message(root, res["message"], "data")
+        Path(args.msg_file).write_text(mask_secrets(msg) + "\n", encoding="utf-8")
     set_github_output("changed", "true" if res["written"] else "false")
     set_github_output("quality_ok", "true" if res["ok"] else "false")
     return 0

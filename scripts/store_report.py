@@ -23,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import reports_lib as rl  # noqa: E402
+import vault  # noqa: E402
 from zumi_common import UTC, load_config, mask_secrets, repo_root, set_github_output, utc_now  # noqa: E402
 
 
@@ -84,16 +85,21 @@ def main(argv: list[str] | None = None) -> int:
         # Never echo the payload itself: it could hold something private.
         print(f"error: rejected payload: {exc}", file=sys.stderr)
         return 1
+    except vault.VaultError as exc:
+        print(f"error: vault: {exc}", file=sys.stderr)   # fail closed: nothing is stored in plaintext
+        return 1
     rep = res["report"]
     if res["stripped"]:
         # key names only, never values
         print(f"warning: stripped non-aggregate / unknown keys: {', '.join(res['stripped'][:40])}")
     if res.get("unchanged"):
-        print(f"heartbeat unchanged since the previous report, not stored acct={rep['acct']} day={rep['data']['day']}")
+        line = f"heartbeat unchanged since the previous report, not stored acct={rep['acct']} day={rep['data']['day']}"
+        print(vault.public_log(root, line, "heartbeat unchanged, not stored"))
     elif rep["kind"] == "ea_agg":
         day = rep["data"]["periods"].get("day", {})
-        print(f"stored {res['path'].relative_to(root)} acct={rep['acct']} aggregate day={rep['data']['day']} "
-              f"n={day.get('n', 0)}")
+        line = (f"stored {res['path'].relative_to(root)} acct={rep['acct']} aggregate day={rep['data']['day']} "
+                f"n={day.get('n', 0)}")
+        print(vault.public_log(root, line, "stored 1 aggregate report (encrypted)"))
     else:
         print(f"stored {res['path'].relative_to(root)} acct={rep['acct']} part={rep['part']}/{rep['parts']} "
               f"trades={len(rep['data']['trades'])} log={len(rep['data']['log'])}")
@@ -110,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             msg = (f"reports: {rep['acct']} part {rep['part']}/{rep['parts']}, {len(rep['data']['trades'])} deal(s)"
                    + (f" {sum(pl):+.2f}%" if pl else "") + f", {len(rep['data']['log'])} log line(s), "
                    + " ".join(d.isoformat() for d in res["dates"]))
-        Path(args.msg_out).write_text(mask_secrets(msg) + "\n", encoding="utf-8")
+        Path(args.msg_out).write_text(mask_secrets(vault.commit_message(root, msg, "reports")) + "\n", encoding="utf-8")
     set_github_output("acct", rep["acct"])
     set_github_output("dates", " ".join(d.isoformat() for d in res["dates"]))
     return 0

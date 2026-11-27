@@ -6,7 +6,8 @@ import datetime as dt
 import io
 from pathlib import Path
 
-from zumi_common import rnd, write_text_atomic
+import vault
+from zumi_common import rnd
 
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
@@ -51,15 +52,14 @@ def parse_fred_csv(text: str, series_id: str) -> list[Row]:
 
 
 def read_history(path: Path) -> list[Row]:
-    if not path.exists():
+    if not vault.exists(path):
         return []
     rows: list[Row] = []
-    with open(path, encoding="utf-8") as fh:
-        reader = csv.reader(fh)
-        next(reader, None)
-        for rec in reader:
-            if len(rec) >= 2 and rec[1] not in ("", "."):
-                rows.append((rec[0], float(rec[1])))
+    reader = csv.reader(io.StringIO(vault.read_text(path)))   # plaintext unless a vault glob selects data/history
+    next(reader, None)
+    for rec in reader:
+        if len(rec) >= 2 and rec[1] not in ("", "."):
+            rows.append((rec[0], float(rec[1])))
     rows.sort(key=lambda r: r[0])
     return rows
 
@@ -83,11 +83,7 @@ def _fmt(value: float) -> str:
 
 
 def write_history_if_changed(path: Path, rows: list[Row]) -> bool:
-    text = format_history(rows)
-    if path.exists() and path.read_text(encoding="utf-8") == text:
-        return False
-    write_text_atomic(path, text)
-    return True
+    return vault.write_text(path, format_history(rows))
 
 
 def summarize(rows: list[Row], asof: dt.date) -> dict | None:

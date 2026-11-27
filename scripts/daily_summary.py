@@ -26,7 +26,8 @@ import agg  # noqa: E402
 import calendar_events  # noqa: E402
 import journal_stats as js  # noqa: E402
 import reports_lib as rl  # noqa: E402
-from zumi_common import UTC, dumps_pretty, load_config, repo_root, utc_now, write_text_atomic  # noqa: E402
+import vault  # noqa: E402
+from zumi_common import UTC, dumps_pretty, load_config, repo_root, utc_now  # noqa: E402
 
 
 # ---------------------------------------------------------------- formatting
@@ -434,10 +435,8 @@ def render_page(title: str, kind: str, per_acct: dict[str, list[dict]], cfg: dic
 
 
 def write_if_changed(path: Path, text: str) -> bool:
-    if path.exists() and path.read_text(encoding="utf-8") == text:
-        return False
-    write_text_atomic(path, text)
-    return True
+    """Plaintext or .zv per config/settings.json > vault; no change on disk when the content is the same."""
+    return vault.write_text(path, text)
 
 
 def iso_week(d: dt.date) -> str:
@@ -523,9 +522,9 @@ def last_by_acct_all(reports: list[dict], acct: str, pred) -> list[dict]:
 
 def all_agg_reports(root: Path) -> list[dict]:
     out = []
-    for p in sorted((root / "reports").glob("[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9]/*.json")):
+    for p in vault.glob(root / "reports", "[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9]/*.json"):
         try:
-            r = json.loads(p.read_text(encoding="utf-8"))
+            r = json.loads(vault.read_text(p, root))
         except (OSError, json.JSONDecodeError):
             continue
         if r.get("kind") == "ea_agg":

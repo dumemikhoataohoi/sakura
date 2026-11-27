@@ -27,6 +27,7 @@ import argparse
 import bisect
 import csv
 import datetime as dt
+import io
 import json
 import re
 import sys
@@ -36,6 +37,7 @@ import agg
 import control
 import coordinator_report as coord
 import reports_lib as rl
+import vault
 from zumi_common import (UTC, dumps_pretty, iso_z, load_config, mask_secrets, parse_utc, repo_root, utc_now,
                          write_text_atomic)
 
@@ -106,7 +108,7 @@ def open_hours(t0: dt.datetime, t1: dt.datetime) -> float:
 
 def _load(path: Path):
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(vault.read_text(path))
     except (OSError, json.JSONDecodeError):
         return None
 
@@ -366,7 +368,7 @@ def github_rows(root: Path, now: dt.datetime, all_reps: dict[str, list[dict]]) -
         pages = {"daily": root / "reports" / "daily" / f"{d.isoformat()}.md",
                  "weekly": root / "reports" / "weekly" / f"{iso[0]}-W{iso[1]:02d}.md",
                  "monthly": root / "reports" / "monthly" / f"{d.strftime('%Y-%m')}.md"}
-        missing = [k for k, p in pages.items() if not p.is_file()]
+        missing = [k for k, p in pages.items() if not vault.exists(p)]
         rows.append(_row(agent, "Analytics", "WARN" if missing else "OK",
                          f"summary page missing for the last report day: {', '.join(missing)}" if missing
                          else "daily, weekly and monthly pages exist for the last report day", day=d.isoformat()))
@@ -375,7 +377,7 @@ def github_rows(root: Path, now: dt.datetime, all_reps: dict[str, list[dict]]) -
     raw = _load(root / control.CONTROL_PATH)
     norm, errors, _ = control.normalize(raw, now) if isinstance(raw, dict) else (None, ["missing or unreadable"], [])
     eff = control.effective(norm, now)
-    coord_days = sorted(p.stem for p in (root / "reports" / "coord").glob("*.md") if re.match(r"^\d{4}-\d{2}-\d{2}$", p.stem))
+    coord_days = sorted(p.stem for p in vault.glob(root / "reports" / "coord", "*.md") if re.match(r"^\d{4}-\d{2}-\d{2}$", p.stem))
     coord_last = coord_days[-1] if coord_days else None
     coord_age = (now.date() - dt.date.fromisoformat(coord_last)).days if coord_last else None
     if norm is None:
@@ -430,7 +432,7 @@ def claude_rows(root: Path, now: dt.datetime, all_reps: dict[str, list[dict]]) -
     agent = "Claude"
     rows = [_row(agent, "Analyst", "SKIP", "market analysis lives in the session report: not checked offline")]
     log = root / control.CHANGELOG_PATH
-    hits = CHANGELOG_RE.findall(log.read_text(encoding="utf-8")) if log.is_file() else []
+    hits = CHANGELOG_RE.findall(vault.read_text(log)) if vault.exists(log) else []
     if not hits:
         rows.append(_row(agent, "Coordinator", "WARN", "no decision in control/CHANGELOG.md"))
     else:
@@ -585,12 +587,12 @@ class RepoFacts:
         self.root, self.now, self.cfg = root, now, cfg
         log = root / control.CHANGELOG_PATH
         self.decisions = sorted(parse_utc(t + ":00Z") for t, _ in
-                                CHANGELOG_RE.findall(log.read_text(encoding="utf-8") if log.is_file() else ""))
+                                CHANGELOG_RE.findall(vault.read_text(log) if vault.exists(log) else ""))
         self.history: dict[str, list[str]] = {}
         for sid in (cfg.get("fred") or {}).get("series", []):
             path = root / "data" / "history" / f"{sid}.csv"
-            if path.is_file():
-                with open(path, encoding="utf-8", newline="") as fh:
+            if vault.exists(path):
+                with io.StringIO(vault.read_text(path)) as fh:
                     self.history[sid] = sorted(row[0] for row in csv.reader(fh)
                                                if row and re.match(r"^\d{4}-\d{2}-\d{2}$", row[0]))
         self.report_days = sorted({str(r["data"].get("day")) for rs in all_reps.values() for r in rs})
@@ -599,8 +601,8 @@ class RepoFacts:
         self.control_ok = norm is not None and raw == norm
         ledger = root / str((cfg.get("agents_kpi") or {}).get("scenario_ledger", "reports/scenario_ledger.csv"))
         self.scenarios: list[tuple[str, int]] | None = None
-        if ledger.is_file():                            # columns date, hit (1 = the scenario that played out was called)
-            with open(ledger, encoding="utf-8", newline="") as fh:
+        if vault.exists(ledger):                            # columns date, hit (1 = the scenario that played out was called)
+            with io.StringIO(vault.read_text(ledger)) as fh:
                 rows = list(csv.DictReader(fh))
             if rows and {"date", "hit"} <= set(rows[0]):
                 self.scenarios = [(r["date"][:10], 1 if str(r["hit"]).strip().lower() in ("1", "true") else 0) for r in rows]
@@ -614,7 +616,7 @@ class RepoFacts:
             rcfg = self.cfg.get("reports") or {}
             for path in rl.iter_report_files(self.root, day, day):
                 files += 1
-                text = path.read_text(encoding="utf-8")
+                text = vault.read_text(path, self.root)
                 try:
                     r = json.loads(text)
                     if r.get("kind") != "ea_agg":
@@ -668,7 +670,7 @@ class RepoFacts:
                 need |= {f"daily/{d.isoformat()}.md", f"weekly/{iso[0]}-W{iso[1]:02d}.md", f"monthly/{d.strftime('%Y-%m')}.md"}
             if not need:
                 return None, 0
-            return round(100.0 * sum(1 for p in need if (self.root / "reports" / p).is_file()) / len(need), 1), len(need)
+            return round(100.0 * sum(1 for p in need if vault.exists(self.root / "reports" / p)) / len(need), 1), len(need)
         if name == "control_valid":                     # only the current file is known offline
             return ((100.0 if self.control_ok else 0.0) if end == self.now.date() else None), 1
         if name == "leaks":
@@ -854,10 +856,10 @@ def write(root: Path, res: dict) -> bool:
     out = root / OUT_DIR
     js = out / f"{res['day']}.json"
     prev = _load(js)
-    if isinstance(prev, dict) and stable(prev) == stable(res) and (out / f"{res['day']}.md").is_file():
+    if isinstance(prev, dict) and stable(prev) == stable(res) and vault.exists(out / f"{res['day']}.md"):
         return False
-    write_text_atomic(js, dumps_pretty(res))
-    write_text_atomic(out / f"{res['day']}.md", render(res))
+    vault.write_text(js, dumps_pretty(res), root)
+    vault.write_text(out / f"{res['day']}.md", render(res), root)
     return True
 
 
@@ -880,8 +882,9 @@ def main(argv: list[str] | None = None) -> int:
     changed = write(root, res)
     msg = commit_message(res)
     if args.msg_file:
-        Path(args.msg_file).write_text(msg + "\n", encoding="utf-8")
-    print(("wrote " if changed else "unchanged ") + f"{OUT_DIR.as_posix()}/{res['day']}.md: {msg}")
+        Path(args.msg_file).write_text(vault.commit_message(root, msg, "agents") + "\n", encoding="utf-8")
+    line = ("wrote " if changed else "unchanged ") + f"{OUT_DIR.as_posix()}/{res['day']}.md"
+    print(vault.public_log(root, f"{line}: {msg}", line))
     return 0
 
 

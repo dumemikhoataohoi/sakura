@@ -38,6 +38,17 @@
 //|  any time the same way (EA shadow cells "SESS:REASON"). Extra    |
 //|  dimension only: ZGB_PhaseKey and the control codes are         |
 //|  unchanged. Reporting only, no new inputs.                       |
+//|  2.8: vault (ZV2, sakura scripts/vault.py). With the key file    |
+//|  MQL5\Files\zumi_vault.key (64 hex = repo secret ZUMI_KEY; never |
+//|  an input, so it is not in .set files / templates / tester logs) |
+//|  the bridge fetches <path>.zv of control.json / latest.json      |
+//|  first, verifies the HMAC tag and decrypts (ZGB_VaultDecrypt);   |
+//|  404 = not encrypted yet -> plaintext on the next timer call.    |
+//|  Bad tag / nonce = NEUTRAL (control) or "no data" (latest). Once |
+//|  a .zv decrypted OK the latch file zgb_vault_latch is set: then a|
+//|  404 or a plaintext copy is refused (downgrade). No key file =   |
+//|  plaintext only (2.7 behaviour). The key is never printed (only  |
+//|  its fingerprint HMAC(K,"fp")[:4]). No new input.                |
 //|  2.5 FIX: ZGB_CodeForComment(cmt) is the one comment -> M### path|
 //|  for reports (entry deal comment) AND control (the EA passes the |
 //|  order comment); control phases are keyed like the server       |
@@ -87,7 +98,11 @@
 #ifndef ZUMI_GITHUB_BRIDGE_MQH
 #define ZUMI_GITHUB_BRIDGE_MQH
 
-#define ZGB_VERSION "2.7"
+#define ZGB_VERSION "2.8"
+#define ZGB_HAS_VAULT                  // 2.8: ZV2 decryption of <path>.zv (ZGB_VaultDecrypt; sakura scripts/vault.py)
+#define ZGB_VAULT_SUFFIX ".zv"
+#define ZGB_VAULT_KEY_FILE   "zumi_vault.key"   // 2.8: key file in MQL5\Files (first line, 64 hex = repo secret ZUMI_KEY)
+#define ZGB_VAULT_LATCH_FILE "zgb_vault_latch"  // 2.8: set once a .zv decrypted OK; then no plaintext / 404 is accepted
 #define ZGB_HAS_MKTCTX                 // 2.4: ZGB_SetMarketCtx available (EA161 v1.31 tests this)
 #define ZGB_CTX_MAX 1800               // 2.4: max bytes of the mkt.ctx object
 #define ZGB_HAS_SHADOW                 // 2.5: ZGB_SetShadowStats available (EA161 v1.32 tests this)
@@ -593,6 +608,340 @@ bool ZGB_ReadFile(const string name, string &text)
   }
 
 //+------------------------------------------------------------------+
+//| VAULT (2.8): ZV2 decryption, = sakura scripts/vault.py           |
+//+------------------------------------------------------------------+
+// ZGB_VAULT_KAT_BEGIN  ZV2 known-answer vectors, DUMMY key (= sakura scripts/vault.py KAT_*; tests/test_mql5_static.py
+//                      parses this block and checks it against vault.py and the ZGB_KAT_* constants below)
+// key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+// ke = 15af4db835c7efd905dc40f7184be15040daefd8c7a7f94b25abffa2782316f7
+// km = 06017ccc7c868fec3e36172025bb51146618c3cd01b4f8ba632ee5c65abab08b
+// fp = 38906176
+// rfc4231 = 5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843
+// case1.path = control/control.json
+// case1.pt_hex = 7b2276223a317d
+// case1.zv = ZV2:IQuhLFGHcQNuIwnp8RMwuV5ORCveA_WBATIJ_EgDw7Sq3NV6qB33kmpnVSUbznYmd3LhzBstkA
+// case2.path = data/latest.json
+// case2.pt_hex =
+// case2.zv = ZV2:iUr3RQRJH8wb-wQ7Y48FfSsnYNMALhqgLssXd0asT6yaLDan1fh-h5mJNbqTLTOn
+// case3.path = data/latest.json
+// case3.pt_hex = 7b22736368656d61223a227a756d692e6c6174657374222c2276223a312c226e6f7465223a226b6174206d756c74692d626c6f636b2030313233343536373839206162636465666768696a206b6c6d6e6f7071727374227d
+// case3.zv = ZV2:Zk8fLBOuBMJCYgYU7r5JSXWGh2ljhAWwdhGcZnXdzVGOESTaBbIFxchdy-1QkZINZ3dAYgCBzBYN5kySLCYS3E_yNx2WyAYuRsHzEXO-64vqX7kUTSMhmvzTq7LE3-zVE98h3xoIum4kTZKNJlCgkcUBjMa6VC5dK03TqhS18JXgVNYWr8e47Q
+// ZGB_VAULT_KAT_END
+#define ZGB_KAT_KEY     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+#define ZGB_KAT_FP      "38906176"
+#define ZGB_KAT_RFC4231 "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+#define ZGB_KAT_P1      "control/control.json"
+#define ZGB_KAT_T1      "7b2276223a317d"
+#define ZGB_KAT_Z1      "ZV2:IQuhLFGHcQNuIwnp8RMwuV5ORCveA_WBATIJ_EgDw7Sq3NV6qB33kmpnVSUbznYmd3LhzBstkA"
+#define ZGB_KAT_P2      "data/latest.json"
+#define ZGB_KAT_T2      ""
+#define ZGB_KAT_Z2      "ZV2:iUr3RQRJH8wb-wQ7Y48FfSsnYNMALhqgLssXd0asT6yaLDan1fh-h5mJNbqTLTOn"
+#define ZGB_KAT_P3      "data/latest.json"
+#define ZGB_KAT_T3      "7b22736368656d61223a227a756d692e6c6174657374222c2276223a312c226e6f7465223a226b6174206d756c74692d626c6f636b2030313233343536373839206162636465666768696a206b6c6d6e6f7071727374227d"
+#define ZGB_KAT_Z3      "ZV2:Zk8fLBOuBMJCYgYU7r5JSXWGh2ljhAWwdhGcZnXdzVGOESTaBbIFxchdy-1QkZINZ3dAYgCBzBYN5kySLCYS3E_yNx2WyAYuRsHzEXO-64vqX7kUTSMhmvzTq7LE3-zVE98h3xoIum4kTZKNJlCgkcUBjMa6VC5dK03TqhS18JXgVNYWr8e47Q"
+
+bool     g_zgbVaultOk  = false;     // 2.8: the key file held a valid key that passed the self-test
+uchar    g_zgbVaultKey[];           // 2.8: 32-byte master key (never printed, never written anywhere)
+bool     g_zgbLatZv    = false;     // 2.8: the next latest.json fetch tries latest.json.zv first
+bool     g_zgbCtlZv    = false;     // 2.8: the next control fetch tries control.json.zv first
+bool     g_zgbLatchCtl = false;     // 2.8: control.json.zv decrypted OK once (ZGB_VAULT_LATCH_FILE): no plaintext ever again
+bool     g_zgbLatchLat = false;     // 2.8: same for latest.json.zv
+
+// string -> UTF-8 bytes, no trailing NUL (the array is reset first)
+void ZGB_StrBytes(const string s, uchar &out[])
+  {
+   ArrayResize(out, 0);
+   int len = StringLen(s);
+   if(len <= 0) return;
+   int n = StringToCharArray(s, out, 0, len, CP_UTF8);
+   ArrayResize(out, (int)MathMax(n, 0));
+  }
+
+// append count bytes of src (from start) to dst
+void ZGB_BytesCat(uchar &dst[], const uchar &src[], const int start, const int count)
+  {
+   if(count <= 0) return;
+   int n = ArraySize(dst);
+   ArrayResize(dst, n + count);
+   for(int i = 0; i < count; i++) dst[n + i] = src[start + i];
+  }
+
+// append u16be(v): the ZV2 length prefix of the path
+void ZGB_BytesU16(uchar &dst[], const int v)
+  {
+   int n = ArraySize(dst);
+   ArrayResize(dst, n + 2);
+   dst[n] = (uchar)((v >> 8) & 0xFF);
+   dst[n + 1] = (uchar)(v & 0xFF);
+  }
+
+string ZGB_BytesHex(const uchar &b[])
+  {
+   string h = "";
+   for(int i = 0; i < ArraySize(b); i++) h += StringFormat("%02x", (int)b[i]);
+   return(h);
+  }
+
+int ZGB_HexVal(const ushort c)
+  {
+   if(c >= '0' && c <= '9') return((int)c - '0');
+   if(c >= 'a' && c <= 'f') return((int)c - 'a' + 10);
+   if(c >= 'A' && c <= 'F') return((int)c - 'A' + 10);
+   return(-1);
+  }
+
+bool ZGB_HexBytes(const string h, uchar &out[])
+  {
+   ArrayResize(out, 0);
+   int n = StringLen(h);
+   if(n % 2 != 0) return(false);
+   ArrayResize(out, n / 2);
+   for(int i = 0; i < n / 2; i++)
+     {
+      int hi = ZGB_HexVal(StringGetCharacter(h, 2 * i));
+      int lo = ZGB_HexVal(StringGetCharacter(h, 2 * i + 1));
+      if(hi < 0 || lo < 0) { ArrayResize(out, 0); return(false); }
+      out[i] = (uchar)(hi * 16 + lo);
+     }
+   return(true);
+  }
+
+bool ZGB_Sha256(const uchar &data[], uchar &out[])
+  {
+   uchar nokey[];
+   ArrayResize(nokey, 0);
+   return(CryptEncode(CRYPT_HASH_SHA256, data, nokey, out) == 32);
+  }
+
+// HMAC-SHA256 (RFC 2104): SHA256((K0 ^ opad) || SHA256((K0 ^ ipad) || msg)), K0 = key padded to the 64-byte block
+bool ZGB_HmacSha256(const uchar &key[], const uchar &msg[], uchar &out[])
+  {
+   uchar k0[], kh[], ib[], ih[], ob[];
+   ArrayResize(out, 0);
+   ArrayResize(k0, 64);
+   for(int i = 0; i < 64; i++) k0[i] = 0;
+   int kn = ArraySize(key);
+   if(kn > 64)
+     {
+      if(!ZGB_Sha256(key, kh)) return(false);
+      for(int i = 0; i < 32; i++) k0[i] = kh[i];
+     }
+   else
+      for(int i = 0; i < kn; i++) k0[i] = key[i];
+   int mn = ArraySize(msg);
+   ArrayResize(ib, 64 + mn);
+   for(int i = 0; i < 64; i++) ib[i] = (uchar)(k0[i] ^ 0x36);
+   for(int i = 0; i < mn; i++) ib[64 + i] = msg[i];
+   if(!ZGB_Sha256(ib, ih)) return(false);
+   ArrayResize(ob, 96);
+   for(int i = 0; i < 64; i++) ob[i] = (uchar)(k0[i] ^ 0x5c);
+   for(int i = 0; i < 32; i++) ob[64 + i] = ih[i];
+   return(ZGB_Sha256(ob, out));
+  }
+
+int ZGB_B64Val(const ushort c)
+  {
+   if(c >= 'A' && c <= 'Z') return((int)c - 'A');
+   if(c >= 'a' && c <= 'z') return((int)c - 'a' + 26);
+   if(c >= '0' && c <= '9') return((int)c - '0' + 52);
+   if(c == '-' || c == '+') return(62);
+   if(c == '_' || c == '/') return(63);
+   return(-1);
+  }
+
+// base64url (padding optional) -> bytes; false on any other character
+bool ZGB_B64UrlDecode(const string s, uchar &out[])
+  {
+   int n = StringLen(s);
+   ArrayResize(out, n * 3 / 4 + 3);
+   int acc = 0, bits = 0, k = 0;
+   for(int i = 0; i < n; i++)
+     {
+      ushort c = StringGetCharacter(s, i);
+      if(c == '=') break;
+      int v = ZGB_B64Val(c);
+      if(v < 0) { ArrayResize(out, 0); return(false); }
+      acc = ((acc << 6) | v) & 0xFFFFFF;
+      bits += 6;
+      if(bits >= 8)
+        {
+         bits -= 8;
+         out[k] = (uchar)((acc >> bits) & 0xFF);
+         k++;
+        }
+     }
+   ArrayResize(out, k);
+   return(true);
+  }
+
+string ZGB_VaultFp(const uchar &k[])   // key fingerprint HMAC(K, "fp")[:4] = sakura `vault.py doctor` / vault.key_fp
+  {
+   uchar lab[], mac[];
+   ZGB_StrBytes("fp", lab);
+   if(!ZGB_HmacSha256(k, lab, mac)) return("--------");
+   return(StringSubstr(ZGB_BytesHex(mac), 0, 8));
+  }
+
+// ZV2 ("ZV2:" + base64url(N || tag || ct)) -> plaintext bytes. The tag HMAC(Km, "tag" || N || u16be(len) || path || ct)
+// is checked in constant time BEFORE anything is decrypted; then N must equal HMAC(Km, "nonce" || u16be(len) || path ||
+// pt)[:16]. false = reject (never partial plaintext).
+bool ZGB_VaultOpen(const uchar &k[], const string path, const string text, uchar &pt[])
+  {
+   ArrayResize(pt, 0);
+   if(ArraySize(k) != 32) return(false);
+   string t = ZGB_Trim(text);
+   if(StringLen(t) < 4 || StringSubstr(t, 0, 4) != "ZV2:") return(false);
+   uchar blob[];
+   if(!ZGB_B64UrlDecode(StringSubstr(t, 4), blob)) return(false);
+   int n = ArraySize(blob) - 48;
+   if(n < 0) return(false);
+   uchar lab[], ke[], km[], p[], m[], mac[];
+   ZGB_StrBytes("zumi-enc-v1", lab);
+   if(!ZGB_HmacSha256(k, lab, ke)) return(false);
+   ZGB_StrBytes("zumi-mac-v1", lab);
+   if(!ZGB_HmacSha256(k, lab, km)) return(false);
+   ZGB_StrBytes(path, p);
+   int pn = ArraySize(p);
+   if(pn > 65535) return(false);
+   ZGB_StrBytes("tag", m);
+   ZGB_BytesCat(m, blob, 0, 16);
+   ZGB_BytesU16(m, pn);
+   ZGB_BytesCat(m, p, 0, pn);
+   ZGB_BytesCat(m, blob, 48, n);
+   if(!ZGB_HmacSha256(km, m, mac)) return(false);
+   int diff = 0;
+   for(int i = 0; i < 32; i++) diff |= ((int)mac[i] ^ (int)blob[16 + i]);
+   if(diff != 0) return(false);
+   uchar ctr[], ks[];
+   ArrayResize(pt, n);
+   for(int b = 0; b * 32 < n; b++)   // keystream block b = HMAC(Ke, N || uint32be(b))
+     {
+      ArrayResize(ctr, 0);
+      ZGB_BytesCat(ctr, blob, 0, 16);
+      ArrayResize(ctr, 20);
+      ctr[16] = (uchar)((b >> 24) & 0xFF);
+      ctr[17] = (uchar)((b >> 16) & 0xFF);
+      ctr[18] = (uchar)((b >> 8) & 0xFF);
+      ctr[19] = (uchar)(b & 0xFF);
+      if(!ZGB_HmacSha256(ke, ctr, ks)) { ArrayResize(pt, 0); return(false); }
+      for(int j = 0; j < 32 && b * 32 + j < n; j++) pt[b * 32 + j] = (uchar)(blob[48 + b * 32 + j] ^ ks[j]);
+     }
+   ZGB_StrBytes("nonce", m);
+   ZGB_BytesU16(m, pn);
+   ZGB_BytesCat(m, p, 0, pn);
+   ZGB_BytesCat(m, pt, 0, n);
+   if(!ZGB_HmacSha256(km, m, mac)) { ArrayResize(pt, 0); return(false); }
+   diff = 0;
+   for(int i = 0; i < 16; i++) diff |= ((int)mac[i] ^ (int)blob[i]);
+   if(diff != 0) { ArrayResize(pt, 0); return(false); }
+   return(true);
+  }
+
+bool ZGB_VaultDecryptK(const uchar &k[], const string path, const string text, string &out)
+  {
+   out = "";
+   uchar pt[];
+   if(!ZGB_VaultOpen(k, path, text, pt)) return(false);
+   if(ArraySize(pt) > 0) out = CharArrayToString(pt, 0, ArraySize(pt), CP_UTF8);
+   return(true);
+  }
+
+// 2.8 API: decrypt a fetched <path>.zv with the key file's key. path = the PLAINTEXT repo path (e.g. InpGhControlPath).
+bool ZGB_VaultDecrypt(const string path, const string text, string &out)
+  {
+   out = "";
+   if(!g_zgbVaultOk) return(false);
+   return(ZGB_VaultDecryptK(g_zgbVaultKey, path, text, out));
+  }
+
+// Known-answer self-test (RFC 4231 HMAC vector + the ZGB_KAT_* ZV2 vectors, + tamper / path-swap rejection).
+bool ZGB_VaultSelfTest(void)
+  {
+   uchar k[], m[], mac[], pt[];
+   ZGB_StrBytes("Jefe", k);
+   ZGB_StrBytes("what do ya want for nothing?", m);
+   if(!ZGB_HmacSha256(k, m, mac) || ZGB_BytesHex(mac) != ZGB_KAT_RFC4231) return(false);
+   if(!ZGB_HexBytes(ZGB_KAT_KEY, k) || ZGB_VaultFp(k) != ZGB_KAT_FP) return(false);
+   if(!ZGB_VaultOpen(k, ZGB_KAT_P1, ZGB_KAT_Z1, pt) || ZGB_BytesHex(pt) != ZGB_KAT_T1) return(false);
+   if(!ZGB_VaultOpen(k, ZGB_KAT_P2, ZGB_KAT_Z2, pt) || ZGB_BytesHex(pt) != ZGB_KAT_T2) return(false);
+   if(!ZGB_VaultOpen(k, ZGB_KAT_P3, ZGB_KAT_Z3, pt) || ZGB_BytesHex(pt) != ZGB_KAT_T3) return(false);
+   string bad = ZGB_KAT_Z1;
+   StringSetCharacter(bad, 10, (ushort)(StringGetCharacter(bad, 10) == 'A' ? 'B' : 'A'));
+   if(ZGB_VaultOpen(k, ZGB_KAT_P1, bad, pt)) return(false);              // tampered -> rejected
+   if(ZGB_VaultOpen(k, ZGB_KAT_P3, ZGB_KAT_Z1, pt)) return(false);       // other path -> rejected
+   return(true);
+  }
+
+// Latch file (MQL5\Files, or Common\Files with InpGhUseCommonFiles): one word per line, "control" / "latest". Once a
+// .zv of that file decrypted OK, a 404 or a plaintext copy is never accepted again (NEUTRAL / no data). Delete the
+// file by hand only to roll the repository back to plaintext on purpose.
+void ZGB_VaultLatchLoad(void)
+  {
+   string t;
+   g_zgbLatchCtl = false;
+   g_zgbLatchLat = false;
+   if(!ZGB_ReadFile(ZGB_VAULT_LATCH_FILE, t)) return;
+   g_zgbLatchCtl = StringFind(t, "control") >= 0;
+   g_zgbLatchLat = StringFind(t, "latest") >= 0;
+  }
+
+void ZGB_VaultLatchSet(const bool ctl)
+  {
+   if(ctl ? g_zgbLatchCtl : g_zgbLatchLat) return;
+   if(ctl) g_zgbLatchCtl = true;
+   else g_zgbLatchLat = true;
+   string t = (g_zgbLatchCtl ? "control\n" : "") + (g_zgbLatchLat ? "latest\n" : "");
+   if(!ZGB_WriteFile(ZGB_VAULT_LATCH_FILE, t)) Print("ZumiGitHubBridge vault: cannot write the latch file");
+   PrintFormat("ZumiGitHubBridge vault: %s is encrypted; plaintext copies are refused from now on", ctl ? "control.json" : "latest.json");
+  }
+
+// Called by ZGB_Init. Key: first line of ZGB_VAULT_KEY_FILE in MQL5\Files (Common\Files with InpGhUseCommonFiles),
+// 64 hex = the repo secret ZUMI_KEY. No file = plaintext files only (2.7 behaviour) unless a latch is set.
+void ZGB_VaultInit(void)
+  {
+   g_zgbVaultOk = false;
+   g_zgbLatZv = false;
+   g_zgbCtlZv = false;
+   ArrayResize(g_zgbVaultKey, 0);
+   ZGB_VaultLatchLoad();
+   string ktxt = "";
+   if(FileIsExist(ZGB_VAULT_KEY_FILE, ZGB_FileFlags()))
+     {
+      int fh = FileOpen(ZGB_VAULT_KEY_FILE, FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | ZGB_FileFlags());
+      if(fh != INVALID_HANDLE)
+        {
+         if(!FileIsEnding(fh)) ktxt = ZGB_Trim(FileReadString(fh));
+         FileClose(fh);
+        }
+     }
+   if(StringLen(ktxt) == 0)
+     {
+      if(g_zgbLatchCtl || g_zgbLatchLat)
+         Print("ZumiGitHubBridge vault: key file missing but the vault latch is set -> control NEUTRAL, latest no data");
+      return;
+     }
+   uchar k[];
+   if(StringLen(ktxt) != 64 || !ZGB_HexBytes(ktxt, k))
+     {
+      ktxt = "";
+      Print("ZumiGitHubBridge vault: the key file must hold 64 hex characters -> .zv files are not read");
+      return;
+     }
+   ktxt = "";
+   if(!ZGB_VaultSelfTest())
+     {
+      Print("ZumiGitHubBridge vault: SELF-TEST FAILED -> .zv files are not read (control NEUTRAL once only .zv exists)");
+      return;
+     }
+   ArrayResize(g_zgbVaultKey, 32);
+   for(int i = 0; i < 32; i++) g_zgbVaultKey[i] = k[i];
+   g_zgbVaultOk = true;
+   g_zgbLatZv = true;
+   g_zgbCtlZv = true;
+   PrintFormat("ZumiGitHubBridge vault: key fp %s, self-test OK, reading .zv first", ZGB_VaultFp(g_zgbVaultKey));
+  }
+
+//+------------------------------------------------------------------+
 //| init / deinit                                                    |
 //+------------------------------------------------------------------+
 string ZGB_AccountHash(void)
@@ -789,14 +1138,16 @@ bool ZGB_Init(void)
    g_zgbNetOk = true;
    g_zgbAcct = ZGB_AccountHash();
    ZGB_LoadToken();
-   ZGB_ReadFile(ZGB_CACHE_FILE, g_zgbLatest);
+   ZGB_VaultInit();   // 2.8: key file ZGB_VAULT_KEY_FILE (missing = plaintext only, unless the latch is set)
+   if(!(g_zgbLatchLat && !g_zgbVaultOk)) ZGB_ReadFile(ZGB_CACHE_FILE, g_zgbLatest);   // latch without key: no data
    ZGB_MapLoad();
    ZGB_EventsLoad();
    ZGB_PosxLoad();
    if(InpGhControlEnable)
      {
       string ctl, err;
-      if(ZGB_ReadFile(ZGB_CTL_CACHE, ctl) && !ZGB_CtlApplyText(ctl, false, err)) ZGB_CtlClear();
+      if(g_zgbLatchCtl && !g_zgbVaultOk) ZGB_CtlClear();                // 2.8: latch without key -> NEUTRAL
+      else if(ZGB_ReadFile(ZGB_CTL_CACHE, ctl) && !ZGB_CtlApplyText(ctl, false, err)) ZGB_CtlClear();
       PrintFormat("ZumiGitHubBridge control: enabled, risk cap x%.2f, enable %s, news override %s",
                   ZGB_Clamp(InpGhMaxRiskMult, 0.0, ZGB_CTL_MAXMULT), InpGhAllowEnable ? "allowed" : "off",
                   InpGhAllowNewsOverride ? "allowed" : "off");
@@ -841,6 +1192,14 @@ void ZGB_ResetLatest(ZgbLatest &o)
 bool ZGB_FetchLatest(void)
   {
    string url, headers;
+   if(g_zgbLatchLat && !g_zgbVaultOk)                              // 2.8: latched but no usable key: never plaintext
+     {
+      g_zgbLatest = "";
+      g_zgbNextRead = TimeGMT() + 15 * 60;
+      return(false);
+     }
+   bool zv = g_zgbLatZv || g_zgbLatchLat;                          // 2.8: key set -> latest.json.zv first
+   string lpath = InpGhLatestPath + (zv ? ZGB_VAULT_SUFFIX : "");
    if(InpGhPrivateRepo)
      {
       if(StringLen(g_zgbToken) == 0)
@@ -849,18 +1208,46 @@ bool ZGB_FetchLatest(void)
          g_zgbNextRead = TimeGMT() + 3600;
          return(false);
         }
-      url = InpGhApiBase + "/repos/" + InpGhOwner + "/" + InpGhRepo + "/contents/" + InpGhLatestPath + "?ref=" + InpGhBranch;
+      url = InpGhApiBase + "/repos/" + InpGhOwner + "/" + InpGhRepo + "/contents/" + lpath + "?ref=" + InpGhBranch;
       headers = ZGB_GhHeaders(true, "application/vnd.github.raw+json");
      }
    else
      {
-      url = InpGhRawBase + "/" + InpGhOwner + "/" + InpGhRepo + "/" + InpGhBranch + "/" + InpGhLatestPath;
+      url = InpGhRawBase + "/" + InpGhOwner + "/" + InpGhRepo + "/" + InpGhBranch + "/" + lpath;
       headers = "User-Agent: zumi-ea-bridge\r\n";
      }
    string body;
    int code = ZGB_Http("GET", url, headers, "", body);
    if(code == -2) return(false);   // no budget / network disabled: try again next timer call
    datetime now = TimeGMT();
+   if(zv)
+     {
+      if(code == 404 && g_zgbLatchLat)                              // 2.8: latched: a missing .zv is a downgrade -> no data
+        {
+         Print("ZumiGitHubBridge vault: latest.json.zv missing after the vault latch -> no data");
+         g_zgbLatest = "";
+         code = 0;
+        }
+      else if(code == 404)                                          // 2.8: not encrypted (vault phase 1): plaintext on the next call
+        {
+         g_zgbLatZv = false;
+         g_zgbNextRead = now;
+         return(false);
+        }
+      if(code == 200)
+        {
+         string plain;
+         if(ZGB_VaultDecrypt(InpGhLatestPath, body, plain)) { body = plain; ZGB_VaultLatchSet(false); }
+         else
+           {
+            Print("ZumiGitHubBridge vault: latest.json.zv failed authentication (wrong key or tampered) -> no data");
+            g_zgbLatest = "";                                       // fail closed: ZGB_ReadLatest returns false ("no data")
+            body = "";
+            code = 0;
+           }
+        }
+     }
+   else if(g_zgbVaultOk) g_zgbLatZv = true;                         // 2.8: the next scheduled read tries .zv again
    string schema = "";
    if(code == 200 && ZGB_JString(body, "schema", schema) && schema == "zumi.latest")
      {
@@ -1195,23 +1582,48 @@ bool ZGB_ReadControl(const bool allow_network = true)
   {
    if(!InpGhEnable || !InpGhControlEnable || MQLInfoInteger(MQL_TESTER)) return(false);
    datetime now = TimeGMT();
-   if(allow_network && g_zgbNetOk && now >= g_zgbCtlNextRead)
+   if(g_zgbLatchCtl && !g_zgbVaultOk && now >= g_zgbCtlNextRead)
+     {
+      ZGB_CtlClear();                                               // 2.8: latched but no usable key: NEUTRAL, never plaintext
+      g_zgbCtlNextRead = now + 15 * 60;
+     }
+   else if(allow_network && g_zgbNetOk && now >= g_zgbCtlNextRead)
      {
       string url, headers, body;
+      bool zv = g_zgbCtlZv || g_zgbLatchCtl;                        // 2.8: key set -> control.json.zv first
+      string cpath = InpGhControlPath + (zv ? ZGB_VAULT_SUFFIX : "");
       if(InpGhPrivateRepo)
         {
-         url = InpGhApiBase + "/repos/" + InpGhOwner + "/" + InpGhRepo + "/contents/" + InpGhControlPath + "?ref=" + InpGhBranch;
+         url = InpGhApiBase + "/repos/" + InpGhOwner + "/" + InpGhRepo + "/contents/" + cpath + "?ref=" + InpGhBranch;
          headers = ZGB_GhHeaders(true, "application/vnd.github.raw+json");
         }
       else
         {
-         url = InpGhRawBase + "/" + InpGhOwner + "/" + InpGhRepo + "/" + InpGhBranch + "/" + InpGhControlPath;
+         url = InpGhRawBase + "/" + InpGhOwner + "/" + InpGhRepo + "/" + InpGhBranch + "/" + cpath;
          headers = "User-Agent: zumi-ea-bridge\r\n";
         }
       int code = ZGB_Http("GET", url, headers, "", body);
-      if(code != -2)
+      if(code != -2 && zv && code == 404 && !g_zgbLatchCtl)
+        {
+         g_zgbCtlZv = false;                                        // 2.8: not encrypted (phase 1): plaintext on the next call
+         g_zgbCtlNextRead = now;
+        }
+      else if(code != -2)
         {
          g_zgbCtlNextRead = now + (int)MathMax(5, InpGhControlEveryMin) * 60;
+         if(!zv && g_zgbVaultOk) g_zgbCtlZv = true;                 // 2.8: the next scheduled read tries .zv again
+         if(zv && code == 200)
+           {
+            string plain;
+            if(ZGB_VaultDecrypt(InpGhControlPath, body, plain)) { body = plain; ZGB_VaultLatchSet(true); }
+            else
+              {
+               // wrong key / tampered = invalid file -> NEUTRAL (never the plaintext fallback)
+               Print("ZumiGitHubBridge control: control.json.zv failed authentication (wrong key or tampered) -> NEUTRAL");
+               ZGB_CtlClear();
+               code = 0;
+              }
+           }
          if(code == 200)
            {
             string err;
@@ -1223,7 +1635,7 @@ bool ZGB_ReadControl(const bool allow_network = true)
               }
             else if(StringLen(err) > 0) Print("ZumiGitHubBridge control: " + err);
            }
-         else if(code == 404)
+         else if(code == 404)                                       // also a missing .zv after the latch (downgrade)
            {
             if(g_zgbCtlValid) Print("ZumiGitHubBridge control: file missing (HTTP 404) -> NEUTRAL");
             ZGB_CtlClear();

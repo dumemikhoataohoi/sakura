@@ -41,6 +41,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Vault gate, first: fail fast on a missing / wrong key (vault.key_fp), an undecryptable .zv or a vault-set file
+      # left in plaintext. Vault off and no .zv: passes without a key. The key is never printed.
+      - name: Vault check
+        env:
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
+        run: python scripts/vault.py check
+
       - name: Evaluate rules and comment on the alerts PR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,4 +55,6 @@ jobs:
           WF_NAME: ${{ github.event.workflow_run.name }}
           WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           DRY_RUN: ${{ inputs.dry_run }}
+          # vault on: reads the encrypted files and posts only alert id + severity + ZV1 blob on the public PR
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
         run: python scripts/alerts.py

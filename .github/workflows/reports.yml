@@ -37,9 +37,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Vault gate, first: fail fast on a missing / wrong key (vault.key_fp), an undecryptable .zv or a vault-set file
+      # left in plaintext. Vault off and no .zv: passes without a key. The key is never printed.
+      - name: Vault check
+        env:
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
+        run: python scripts/vault.py check
+
+      # ZUMI_KEY (repo secret): reports/ and docs/dashboard/ are encrypted while vault.enabled (scripts/vault.py).
+      # Passed as env only to this step, never echoed; the payload is still read only from the event file by Python.
       - name: Store report, update journal and summaries
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
+          ZUMI_KEY: ${{ secrets.ZUMI_KEY }}
         run: |
           regen='python scripts/store_report.py --event "$GITHUB_EVENT_PATH" --dates-out "$RUNNER_TEMP/dates.txt" --msg-out "$RUNNER_TEMP/commit_msg.txt" && python scripts/daily_summary.py --dates-file "$RUNNER_TEMP/dates.txt"'
           bash -c "$regen"
