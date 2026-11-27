@@ -3,21 +3,30 @@
   "aggregates": {
     "3238681b19703d89": {
       "all": {
-        "avg_r": -0.333,
+        "avg_r": 0.0,
         "be": 0,
-        "cur_ls": 2,
+        "cur_ls": 0,
         "dd_pct": 0.467,
         "losses": 2,
         "max_ls": 2,
-        "n": 3,
-        "net_pct": -0.345,
-        "net_r": -1.0,
-        "pf": 0.5,
-        "win_pct": 33.3,
-        "wins": 1
+        "n": 4,
+        "net_pct": -0.1,
+        "net_r": 0.0,
+        "pf": 1.0,
+        "win_pct": 50.0,
+        "wins": 2
       },
       "as_of": "2026-11-27",
       "by_method": {
+        "M132": {
+          "cur_ls": 0,
+          "l20_n": 1,
+          "l20_wins": 1,
+          "n": 1,
+          "net_r": 1.0,
+          "win_pct": 100.0,
+          "wins": 1
+        },
         "M237": {
           "cur_ls": 0,
           "l20_n": 1,
@@ -57,13 +66,13 @@
           "wins": 1
         },
         "SDPBN": {
-          "cur_ls": 2,
-          "l20_n": 2,
-          "l20_wins": 0,
-          "n": 2,
-          "net_r": -2.0,
-          "win_pct": 0.0,
-          "wins": 0
+          "cur_ls": 0,
+          "l20_n": 3,
+          "l20_wins": 1,
+          "n": 3,
+          "net_r": -1.0,
+          "win_pct": 33.3,
+          "wins": 1
         }
       },
       "daily": {
@@ -82,18 +91,18 @@
           "wins": 10
         },
         "2026-11-27": {
-          "avg_r": -0.333,
+          "avg_r": 0.0,
           "be": 0,
-          "cur_ls": 2,
+          "cur_ls": 0,
           "dd_pct": 0.467,
           "losses": 2,
           "max_ls": 2,
-          "n": 3,
-          "net_pct": -0.345,
-          "net_r": -1.0,
-          "pf": 0.5,
-          "win_pct": 33.3,
-          "wins": 1
+          "n": 4,
+          "net_pct": -0.1,
+          "net_r": 0.0,
+          "pf": 1.0,
+          "win_pct": 50.0,
+          "wins": 2
         }
       },
       "grid": {
@@ -102,39 +111,41 @@
             "n": 1
           },
           "04": {
-            "n": 2
+            "n": 3,
+            "win_pct": 33.3,
+            "wins": 1
           }
         }
       },
       "months": {
         "2026-11": {
-          "avg_r": -0.333,
+          "avg_r": 0.0,
           "be": 0,
-          "cur_ls": 2,
+          "cur_ls": 0,
           "dd_pct": 0.467,
           "losses": 2,
           "max_ls": 2,
-          "n": 3,
-          "net_pct": -0.345,
-          "net_r": -1.0,
-          "pf": 0.5,
-          "win_pct": 33.3,
-          "wins": 1
+          "n": 4,
+          "net_pct": -0.1,
+          "net_r": 0.0,
+          "pf": 1.0,
+          "win_pct": 50.0,
+          "wins": 2
         }
       },
       "mtd": {
-        "avg_r": -0.333,
+        "avg_r": 0.0,
         "be": 0,
-        "cur_ls": 2,
+        "cur_ls": 0,
         "dd_pct": 0.467,
         "losses": 2,
         "max_ls": 2,
-        "n": 3,
-        "net_pct": -0.345,
-        "net_r": -1.0,
-        "pf": 0.5,
-        "win_pct": 33.3,
-        "wins": 1
+        "n": 4,
+        "net_pct": -0.1,
+        "net_r": 0.0,
+        "pf": 1.0,
+        "win_pct": 50.0,
+        "wins": 2
       },
       "rule": {
         "daily_cap": 0,
@@ -143,18 +154,18 @@
         "risk_cap": 0
       },
       "week": {
-        "avg_r": -0.333,
+        "avg_r": 0.0,
         "be": 0,
-        "cur_ls": 2,
+        "cur_ls": 0,
         "dd_pct": 0.467,
         "losses": 2,
         "max_ls": 2,
-        "n": 3,
-        "net_pct": -0.345,
-        "net_r": -1.0,
-        "pf": 0.5,
-        "win_pct": 33.3,
-        "wins": 1
+        "n": 4,
+        "net_pct": -0.1,
+        "net_r": 0.0,
+        "pf": 1.0,
+        "win_pct": 50.0,
+        "wins": 2
       }
     }
   },
