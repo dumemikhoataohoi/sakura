@@ -1,0 +1,279 @@
+{
+  "acct": "3238681b19703d89",
+  "data": {
+    "day": "2026-11-27",
+    "ea": "Zumi",
+    "eq": {
+      "day_pl_pct": 0.122,
+      "eq_day_pct": 0.122,
+      "float_pct": 0.0
+    },
+    "flags": [],
+    "mkt": {
+      "move_atr": 0.28,
+      "sym": "XAUUSDm"
+    },
+    "periods": {
+      "day": {
+        "avg_r": 1.0,
+        "be": 0,
+        "by_method": {
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "cur_ls": 0,
+        "dd_pct": 0.0,
+        "from": "2026-11-27",
+        "gross_loss_r": 0.0,
+        "gross_win_r": 1.0,
+        "lead_ls": 0,
+        "losses": 0,
+        "mae_r": -0.225,
+        "max_ls": 0,
+        "mfe_r": 0.973,
+        "n": 1,
+        "n_ex": 1.0,
+        "n_r": 1.0,
+        "net_pct": 0.122,
+        "net_r": 1.0,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 100.0,
+        "wins": 1
+      },
+      "mtd": {
+        "avg_r": 1.0,
+        "be": 0,
+        "by_method": {
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "cur_ls": 0,
+        "dd_pct": 0.0,
+        "from": "2026-11-01",
+        "grid": {
+          "Fri": {
+            "00": {
+              "n": 1
+            }
+          }
+        },
+        "gross_loss_r": 0.0,
+        "gross_win_r": 1.0,
+        "lead_ls": 0,
+        "losses": 0,
+        "mae_r": -0.225,
+        "max_ls": 0,
+        "mfe_r": 0.973,
+        "n": 1,
+        "n_ex": 1.0,
+        "n_r": 1.0,
+        "net_pct": 0.122,
+        "net_r": 1.0,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 100.0,
+        "wins": 1
+      },
+      "r30": {
+        "avg_r": 1.0,
+        "be": 0,
+        "by_method": {
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "cur_ls": 0,
+        "dd_pct": 0.0,
+        "from": "2026-10-28",
+        "gross_loss_r": 0.0,
+        "gross_win_r": 1.0,
+        "lead_ls": 0,
+        "losses": 0,
+        "mae_r": -0.225,
+        "max_ls": 0,
+        "mfe_r": 0.973,
+        "n": 1,
+        "n_ex": 1.0,
+        "n_r": 1.0,
+        "net_pct": 0.122,
+        "net_r": 1.0,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 100.0,
+        "wins": 1
+      },
+      "week": {
+        "avg_r": 1.0,
+        "be": 0,
+        "by_method": {
+          "M237": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_method_phase": {
+          "M237:SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "by_phase": {
+          "SDPBL": {
+            "cur_ls": 0,
+            "l20_n": 1,
+            "l20_wins": 1,
+            "n": 1,
+            "net_r": 1.0,
+            "win_pct": 100.0,
+            "wins": 1
+          }
+        },
+        "cur_ls": 0,
+        "dd_pct": 0.0,
+        "from": "2026-11-20",
+        "gross_loss_r": 0.0,
+        "gross_win_r": 1.0,
+        "lead_ls": 0,
+        "losses": 0,
+        "mae_r": -0.225,
+        "max_ls": 0,
+        "mfe_r": 0.973,
+        "n": 1,
+        "n_ex": 1.0,
+        "n_r": 1.0,
+        "net_pct": 0.122,
+        "net_r": 1.0,
+        "rule": {
+          "daily_cap": 0,
+          "news": 0,
+          "no_sl": 0,
+          "risk_cap": 0
+        },
+        "to": "2026-11-27",
+        "win_pct": 100.0,
+        "wins": 1
+      }
+    },
+    "phase": "SDPBL",
+    "reason": "periodic",
+    "ver": "2.2"
+  },
+  "kind": "ea_agg",
+  "part": 1,
+  "parts": 1,
+  "rid": "3238681b19703d89-1795744800",
+  "ts": 1795744800,
+  "v": 2
+}
