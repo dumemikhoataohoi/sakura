@@ -1,0 +1,1159 @@
+{
+  "as_of": "2026-11-27T23:29:11Z",
+  "day": "2026-11-27",
+  "kpi": {
+    "company": {
+      "3238681b19703d89": [
+        {
+          "dept": "Company",
+          "floor": 0.0,
+          "id": "company.net_r_week",
+          "kpi": "net R, last 7 days",
+          "n": 36,
+          "op": ">=",
+          "reason": ">= target 0",
+          "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+          "scope": "3238681b19703d89",
+          "status": "OK",
+          "target": 0.0,
+          "trend": {
+            "30d": {
+              "better": null,
+              "cur": 4.07,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            },
+            "7d": {
+              "better": null,
+              "cur": 4.07,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            }
+          },
+          "value": 4.07,
+          "warn": -3.0,
+          "weeks_met": 0,
+          "window_d": 7
+        },
+        {
+          "dept": "Company",
+          "floor": 0.0,
+          "id": "company.net_r_month",
+          "kpi": "net R, last 30 days",
+          "n": 36,
+          "op": ">=",
+          "reason": ">= target 0",
+          "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+          "scope": "3238681b19703d89",
+          "status": "OK",
+          "target": 0.0,
+          "trend": {
+            "30d": {
+              "better": null,
+              "cur": 4.07,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            },
+            "7d": {
+              "better": null,
+              "cur": 4.07,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            }
+          },
+          "value": 4.07,
+          "warn": -5.0,
+          "weeks_met": 0,
+          "window_d": 30
+        },
+        {
+          "dept": "Company",
+          "floor": 90.0,
+          "id": "company.days_traded_pct",
+          "kpi": "% weekdays with >= 1 trade",
+          "n": 2,
+          "op": ">=",
+          "reason": ">= target 90",
+          "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+          "scope": "3238681b19703d89",
+          "status": "OK",
+          "target": 90.0,
+          "trend": {
+            "30d": {
+              "better": null,
+              "cur": 100.0,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            },
+            "7d": {
+              "better": null,
+              "cur": 100.0,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            }
+          },
+          "value": 100.0,
+          "warn": 70.0,
+          "weeks_met": 0,
+          "window_d": 30
+        },
+        {
+          "dept": "Company",
+          "floor": 60.0,
+          "id": "company.profitable_days_pct",
+          "kpi": "% profitable days (net % > 0) of the days with trades",
+          "n": 2,
+          "op": ">=",
+          "reason": ">= target 60",
+          "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+          "scope": "3238681b19703d89",
+          "status": "OK",
+          "target": 60.0,
+          "trend": {
+            "30d": {
+              "better": null,
+              "cur": 100.0,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            },
+            "7d": {
+              "better": null,
+              "cur": 100.0,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            }
+          },
+          "value": 100.0,
+          "warn": 45.0,
+          "weeks_met": 0,
+          "window_d": 30
+        },
+        {
+          "dept": "Company",
+          "floor": 5.0,
+          "id": "company.dd_month_pct",
+          "kpi": "drawdown month to date %",
+          "n": 2,
+          "op": "<=",
+          "reason": "<= target 5",
+          "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+          "scope": "3238681b19703d89",
+          "status": "OK",
+          "target": 5.0,
+          "trend": {
+            "30d": {
+              "better": null,
+              "cur": 0.73,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            },
+            "7d": {
+              "better": null,
+              "cur": 0.73,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            }
+          },
+          "value": 0.73,
+          "warn": 8.0,
+          "weeks_met": 0,
+          "window_d": 30
+        },
+        {
+          "dept": "Company",
+          "floor": 55.0,
+          "id": "company.win_pct",
+          "kpi": "win% after coordination (real trades)",
+          "n": 36,
+          "op": ">=",
+          "reason": ">= target 55",
+          "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+          "scope": "3238681b19703d89",
+          "status": "OK",
+          "target": 55.0,
+          "trend": {
+            "30d": {
+              "better": null,
+              "cur": 55.6,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            },
+            "7d": {
+              "better": null,
+              "cur": 55.6,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            }
+          },
+          "value": 55.6,
+          "warn": 50.0,
+          "weeks_met": 0,
+          "window_d": 30
+        },
+        {
+          "dept": "Company",
+          "floor": 10.0,
+          "id": "company.lift_pp",
+          "kpi": "coordination lift: win% let through minus win% blocked by CTRL, pp",
+          "n": 0,
+          "op": ">=",
+          "reason": "no CTRL shadow outcomes in the window (needs bridge >= 2.5 and EA161 >= v1.32)",
+          "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+          "scope": "3238681b19703d89",
+          "status": "SKIP",
+          "target": 10.0,
+          "trend": {
+            "30d": {
+              "better": null,
+              "cur": null,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            },
+            "7d": {
+              "better": null,
+              "cur": null,
+              "delta": null,
+              "dir": "n/a",
+              "prev": null
+            }
+          },
+          "value": null,
+          "warn": 0.0,
+          "weeks_met": 0,
+          "window_d": 30
+        }
+      ]
+    },
+    "departments": [
+      {
+        "dept": "Executive (Claude Coordinator)",
+        "floor": 10.0,
+        "id": "exec.lift_pp",
+        "kpi": "win% let through minus win% blocked by CTRL (shadow), pp",
+        "n": 0,
+        "op": ">=",
+        "reason": "no CTRL shadow outcomes in the window (needs bridge >= 2.5 and EA161 >= v1.32)",
+        "role": "T\u1ed5ng gi\u00e1m \u0111\u1ed1c (CEO)",
+        "scope": "3238681b19703d89",
+        "status": "SKIP",
+        "target": 10.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": null,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": null,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": null,
+        "warn": 0.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Executive (Claude Coordinator)",
+        "floor": 0.0,
+        "id": "exec.control_overdue_48h",
+        "kpi": "control.json refresh overdue > 48 h (count)",
+        "n": 4,
+        "op": "<=",
+        "reason": "<= target 0",
+        "role": "T\u1ed5ng gi\u00e1m \u0111\u1ed1c (CEO)",
+        "scope": "repo",
+        "status": "OK",
+        "target": 0.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 0,
+        "warn": 1,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Analysis (Claude Analyst, EA Market)",
+        "floor": 50.0,
+        "id": "analyst.scenario_hit_pct",
+        "kpi": "3-scenario hit rate %",
+        "n": 0,
+        "op": ">=",
+        "reason": "no scenario ledger (agents_kpi.scenario_ledger, columns date, hit) with rows in the window",
+        "role": "Tr\u01b0\u1edfng ph\u00e2n t\u00edch",
+        "scope": "repo",
+        "status": "SKIP",
+        "target": 50.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": null,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": null,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": null,
+        "warn": 40.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Production (EA Signal)",
+        "floor": 100.0,
+        "id": "signal.trades",
+        "kpi": "closed trades in the window",
+        "n": 36,
+        "op": ">=",
+        "reason": "beyond warn 50 (target 100)",
+        "role": "Gi\u00e1m \u0111\u1ed1c s\u1ea3n xu\u1ea5t (Tr\u01b0\u1edfng ph\u00f2ng t\u00edn hi\u1ec7u)",
+        "scope": "3238681b19703d89",
+        "status": "FAIL",
+        "target": 100.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 36,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 36,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 36,
+        "warn": 50,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Production (EA Signal)",
+        "floor": 90.0,
+        "id": "signal.days_traded_pct",
+        "kpi": "% weekdays with >= 1 trade",
+        "n": 2,
+        "op": ">=",
+        "reason": ">= target 90",
+        "role": "Gi\u00e1m \u0111\u1ed1c s\u1ea3n xu\u1ea5t (Tr\u01b0\u1edfng ph\u00f2ng t\u00edn hi\u1ec7u)",
+        "scope": "3238681b19703d89",
+        "status": "OK",
+        "target": 90.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 100.0,
+        "warn": 70.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Production (EA Signal)",
+        "floor": 0.05,
+        "id": "signal.avg_r",
+        "kpi": "net R per trade",
+        "n": 36,
+        "op": ">=",
+        "reason": ">= target 0.05",
+        "role": "Gi\u00e1m \u0111\u1ed1c s\u1ea3n xu\u1ea5t (Tr\u01b0\u1edfng ph\u00f2ng t\u00edn hi\u1ec7u)",
+        "scope": "3238681b19703d89",
+        "status": "OK",
+        "target": 0.05,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 0.113,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 0.113,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 0.113,
+        "warn": 0.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Production (EA Signal)",
+        "id": "signal.trades_growth_pct",
+        "kpi": "+20 % trades per EA version (A14)",
+        "reason": "per-version comparison comes from the research round (docs/research-protocol.md), not from live aggregates",
+        "role": "Gi\u00e1m \u0111\u1ed1c s\u1ea3n xu\u1ea5t (Tr\u01b0\u1edfng ph\u00f2ng t\u00edn hi\u1ec7u)",
+        "scope": "3238681b19703d89",
+        "status": "SKIP"
+      },
+      {
+        "dept": "Risk (EA Risk)",
+        "floor": 3.0,
+        "id": "risk.dd_week_pct",
+        "kpi": "drawdown rolling week %",
+        "n": 2,
+        "op": "<=",
+        "reason": "<= target 3",
+        "role": "Gi\u00e1m \u0111\u1ed1c r\u1ee7i ro (CRO)",
+        "scope": "3238681b19703d89",
+        "status": "OK",
+        "target": 3.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 0.73,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 0.73,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 0.73,
+        "warn": 5.0,
+        "weeks_met": 0,
+        "window_d": 7
+      },
+      {
+        "dept": "Risk (EA Risk)",
+        "floor": 5.0,
+        "id": "risk.dd_month_pct",
+        "kpi": "drawdown month to date %",
+        "n": 2,
+        "op": "<=",
+        "reason": "<= target 5",
+        "role": "Gi\u00e1m \u0111\u1ed1c r\u1ee7i ro (CRO)",
+        "scope": "3238681b19703d89",
+        "status": "OK",
+        "target": 5.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 0.73,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 0.73,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 0.73,
+        "warn": 8.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Risk (EA Risk)",
+        "floor": -3.0,
+        "id": "risk.worst_day_r",
+        "kpi": "worst day net R",
+        "n": 2,
+        "op": ">=",
+        "reason": ">= target -3",
+        "role": "Gi\u00e1m \u0111\u1ed1c r\u1ee7i ro (CRO)",
+        "scope": "3238681b19703d89",
+        "status": "OK",
+        "target": -3.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 2.03,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 2.03,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 2.03,
+        "warn": -3.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Risk (EA Risk)",
+        "floor": 6.0,
+        "id": "risk.max_losing_streak",
+        "kpi": "longest losing streak",
+        "n": 36,
+        "op": "<=",
+        "reason": "<= target 6",
+        "role": "Gi\u00e1m \u0111\u1ed1c r\u1ee7i ro (CRO)",
+        "scope": "3238681b19703d89",
+        "status": "OK",
+        "target": 6.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 4,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 4,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 4,
+        "warn": 9,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Risk (EA Risk)",
+        "floor": 0.0,
+        "id": "risk.hard_violations",
+        "kpi": "hard-limit breaks (no_sl + risk_cap)",
+        "n": 36,
+        "op": "<=",
+        "reason": "<= target 0",
+        "role": "Gi\u00e1m \u0111\u1ed1c r\u1ee7i ro (CRO)",
+        "scope": "3238681b19703d89",
+        "status": "OK",
+        "target": 0.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 0,
+        "warn": 0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Operations (EA Execution)",
+        "id": "execution.slippage",
+        "kpi": "slippage at entry",
+        "reason": "needs the EA journal (slippage, rejects, duplicates, spread): not in the aggregate reports of a public repo",
+        "role": "Gi\u00e1m \u0111\u1ed1c v\u1eadn h\u00e0nh (COO)",
+        "scope": "3238681b19703d89",
+        "status": "SKIP"
+      },
+      {
+        "dept": "Operations (EA Execution)",
+        "id": "execution.duplicates",
+        "kpi": "duplicate orders",
+        "reason": "needs the EA journal (slippage, rejects, duplicates, spread): not in the aggregate reports of a public repo",
+        "role": "Gi\u00e1m \u0111\u1ed1c v\u1eadn h\u00e0nh (COO)",
+        "scope": "3238681b19703d89",
+        "status": "SKIP"
+      },
+      {
+        "dept": "Operations (EA Execution)",
+        "id": "execution.errors",
+        "kpi": "rejected / failed orders",
+        "reason": "needs the EA journal (slippage, rejects, duplicates, spread): not in the aggregate reports of a public repo",
+        "role": "Gi\u00e1m \u0111\u1ed1c v\u1eadn h\u00e0nh (COO)",
+        "scope": "3238681b19703d89",
+        "status": "SKIP"
+      },
+      {
+        "dept": "Audit (EA Shadow)",
+        "floor": 100.0,
+        "id": "shadow.cells_n30_pct",
+        "kpi": "% shadow method x reason cells with n >= 30",
+        "n": 0,
+        "op": ">=",
+        "reason": "no shadow by_method cells in the window (needs bridge >= 2.5 and EA161 >= v1.32)",
+        "role": "Ki\u1ec3m to\u00e1n n\u1ed9i b\u1ed9",
+        "scope": "3238681b19703d89",
+        "status": "SKIP",
+        "target": 100.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": null,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": null,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": null,
+        "warn": 50.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Data (GitHub Data + Quality)",
+        "floor": 100.0,
+        "id": "data.fresh_days_pct",
+        "kpi": "% days with every series fresh (quality.max_age_days)",
+        "n": 30,
+        "op": ">=",
+        "reason": ">= target 100",
+        "role": "D\u1eef li\u1ec7u & h\u1ea1 t\u1ea7ng",
+        "scope": "repo",
+        "status": "OK",
+        "target": 100.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": 0.0,
+            "dir": "flat",
+            "prev": 100.0
+          },
+          "7d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": 0.0,
+            "dir": "flat",
+            "prev": 100.0
+          }
+        },
+        "value": 100.0,
+        "warn": 90.0,
+        "weeks_met": 4,
+        "window_d": 30
+      },
+      {
+        "dept": "Finance (GitHub Analytics)",
+        "floor": 100.0,
+        "id": "finance.pages_on_time_pct",
+        "kpi": "% daily / weekly / monthly pages present for report days",
+        "n": 4,
+        "op": ">=",
+        "reason": ">= target 100",
+        "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+        "scope": "repo",
+        "status": "OK",
+        "target": 100.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 100.0,
+        "warn": 90.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Legal (GitHub Guard)",
+        "floor": 100.0,
+        "id": "legal.control_valid_pct",
+        "kpi": "control.json valid and normalized (now) %",
+        "n": 1,
+        "op": ">=",
+        "reason": ">= target 100",
+        "role": "Ph\u00e1p ch\u1ebf & b\u1ea3o m\u1eadt",
+        "scope": "repo",
+        "status": "OK",
+        "target": 100.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 100.0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 100.0,
+        "warn": 100.0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "Legal (GitHub Guard)",
+        "floor": 0.0,
+        "id": "legal.privacy_leaks",
+        "kpi": "stored reports failing the public whitelist or the token mask",
+        "n": 11,
+        "op": "<=",
+        "reason": "<= target 0",
+        "role": "Ph\u00e1p ch\u1ebf & b\u1ea3o m\u1eadt",
+        "scope": "repo",
+        "status": "OK",
+        "target": 0.0,
+        "trend": {
+          "30d": {
+            "better": null,
+            "cur": 0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          },
+          "7d": {
+            "better": null,
+            "cur": 0,
+            "delta": null,
+            "dir": "n/a",
+            "prev": null
+          }
+        },
+        "value": 0,
+        "warn": 0,
+        "weeks_met": 0,
+        "window_d": 30
+      },
+      {
+        "dept": "R&D (Claude Researcher, Builder, Reviewer)",
+        "id": "rnd.build_gate",
+        "kpi": "new version beats the running one (section 9)",
+        "reason": "build-gate results live in the research rounds outside this public repo",
+        "role": "Gi\u00e1m \u0111\u1ed1c c\u00f4ng ngh\u1ec7 & R&D (CTO)",
+        "scope": "repo",
+        "status": "SKIP"
+      },
+      {
+        "dept": "R&D (Claude Researcher, Builder, Reviewer)",
+        "id": "rnd.review_findings",
+        "kpi": "bugs found in code review",
+        "reason": "review findings are kept in the session, not in repo files",
+        "role": "Gi\u00e1m \u0111\u1ed1c c\u00f4ng ngh\u1ec7 & R&D (CTO)",
+        "scope": "repo",
+        "status": "SKIP"
+      },
+      {
+        "dept": "Owner relations (Claude Reporter)",
+        "id": "owner.report_f7",
+        "kpi": "reports with true figures and a fix per weakness (F7)",
+        "reason": "the user report is a session output: not measurable from repo files",
+        "role": "Quan h\u1ec7 ch\u1ee7 s\u1edf h\u1eefu",
+        "scope": "repo",
+        "status": "SKIP"
+      }
+    ],
+    "ratchet_week": "2026-W47",
+    "review": [
+      {
+        "dept": "Executive (Claude Coordinator)",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "T\u1ed5ng gi\u00e1m \u0111\u1ed1c (CEO)",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "Analysis (Claude Analyst, EA Market)",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "Tr\u01b0\u1edfng ph\u00e2n t\u00edch",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "Production (EA Signal)",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "Gi\u00e1m \u0111\u1ed1c s\u1ea3n xu\u1ea5t (Tr\u01b0\u1edfng ph\u00f2ng t\u00edn hi\u1ec7u)",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "Risk (EA Risk)",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "Gi\u00e1m \u0111\u1ed1c r\u1ee7i ro (CRO)",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "Operations (EA Execution)",
+        "flag": "",
+        "last_outcome": "not measured",
+        "last_week": null,
+        "role": "Gi\u00e1m \u0111\u1ed1c v\u1eadn h\u00e0nh (COO)",
+        "weeks_failed": null
+      },
+      {
+        "dept": "Audit (EA Shadow)",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "Ki\u1ec3m to\u00e1n n\u1ed9i b\u1ed9",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "Data (GitHub Data + Quality)",
+        "flag": "",
+        "last_outcome": "met",
+        "last_week": "2026-W47",
+        "role": "D\u1eef li\u1ec7u & h\u1ea1 t\u1ea7ng",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "Finance (GitHub Analytics)",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "Legal (GitHub Guard)",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "Ph\u00e1p ch\u1ebf & b\u1ea3o m\u1eadt",
+        "weeks_failed": 0
+      },
+      {
+        "dept": "R&D (Claude Researcher, Builder, Reviewer)",
+        "flag": "",
+        "last_outcome": "not measured",
+        "last_week": null,
+        "role": "Gi\u00e1m \u0111\u1ed1c c\u00f4ng ngh\u1ec7 & R&D (CTO)",
+        "weeks_failed": null
+      },
+      {
+        "dept": "Owner relations (Claude Reporter)",
+        "flag": "",
+        "last_outcome": "not measured",
+        "last_week": null,
+        "role": "Quan h\u1ec7 ch\u1ee7 s\u1edf h\u1eefu",
+        "weeks_failed": null
+      },
+      {
+        "dept": "Company",
+        "flag": "",
+        "last_outcome": "n/a",
+        "last_week": "2026-W47",
+        "role": "Gi\u00e1m \u0111\u1ed1c t\u00e0i ch\u00ednh (CFO)",
+        "weeks_failed": 0
+      }
+    ]
+  },
+  "kpis": {
+    "3238681b19703d89": {
+      "cur_losing_streak": 0,
+      "days_traded_30d": 2,
+      "days_traded_7d": 2,
+      "dd_mtd_pct": 0.73,
+      "dd_week_pct": 0.73,
+      "profitable_days_30d": 2,
+      "profitable_days_7d": 2,
+      "reported_days_30d": 2,
+      "reported_days_7d": 2,
+      "trades_today": 18,
+      "weekdays_30d": 22,
+      "weekdays_7d": 5
+    }
+  },
+  "market_open": false,
+  "overall": "WARN",
+  "rows": [
+    {
+      "agent": "EA",
+      "metrics": {},
+      "reason": "WARN: Market, Reporter, Shadow",
+      "status": "WARN",
+      "sub": "-"
+    },
+    {
+      "agent": "EA",
+      "metrics": {
+        "bridge": "2.3",
+        "last_reason": "periodic",
+        "report_age_h": 3.0,
+        "reports_24h": 11
+      },
+      "reason": "no report for > 2.5 market h; bridge 2.3 sends no heartbeat (needs >= 2.4)",
+      "status": "WARN",
+      "sub": "Reporter"
+    },
+    {
+      "agent": "EA",
+      "metrics": {},
+      "reason": "no mkt.ctx in 30 days (needs bridge >= 2.4 and EA161 >= v1.31)",
+      "status": "WARN",
+      "sub": "Market"
+    },
+    {
+      "agent": "EA",
+      "metrics": {
+        "method_codes_30d": 12,
+        "trades_30d": 18,
+        "trades_7d": 18
+      },
+      "reason": "trades in the last 7 days",
+      "status": "OK",
+      "sub": "Signal"
+    },
+    {
+      "agent": "EA",
+      "metrics": {
+        "cur_ls": 0,
+        "dd_mtd_pct": 0.73,
+        "dd_week_pct": 0.73
+      },
+      "reason": "no rule break this week; drawdown below the R05 ladder; no long losing streak",
+      "status": "OK",
+      "sub": "Risk"
+    },
+    {
+      "agent": "EA",
+      "metrics": {},
+      "reason": "no EA flag today, no news-window entry this week",
+      "status": "OK",
+      "sub": "Execution"
+    },
+    {
+      "agent": "EA",
+      "metrics": {},
+      "reason": "no data.shadow in 30 days (needs bridge >= 2.5 and EA161 >= v1.32)",
+      "status": "WARN",
+      "sub": "Shadow"
+    },
+    {
+      "agent": "EA",
+      "metrics": {
+        "file_side": "both"
+      },
+      "reason": "EA does not report gside (needs EA161 >= v1.33)",
+      "status": "SKIP",
+      "sub": "Control client"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {},
+      "reason": "all checked sub-agents OK",
+      "status": "OK",
+      "sub": "-"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {
+        "day": "2026-11-27",
+        "latest_age_h": 0.0,
+        "next_event": "NFP 2026-12-04T13:30:00Z"
+      },
+      "reason": "latest.json fresh",
+      "status": "OK",
+      "sub": "Data"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {
+        "issues": 0,
+        "ok": true,
+        "since": "2026-11-26T15:28:33Z"
+      },
+      "reason": "quality ok, no stale series",
+      "status": "OK",
+      "sub": "Quality"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {
+        "accounts": 1,
+        "last_store_age_h": 3.0,
+        "stored_24h": 11
+      },
+      "reason": "reports stored in the last 24 market h",
+      "status": "OK",
+      "sub": "Report store"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {
+        "day": "2026-11-27"
+      },
+      "reason": "daily, weekly and monthly pages exist for the last report day",
+      "status": "OK",
+      "sub": "Analytics"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {
+        "coord_last": "2026-11-27",
+        "expires_utc": "2026-11-28T23:00:00Z",
+        "hours_left": 23.5,
+        "past_48h": false,
+        "past_72h": false,
+        "seq": 4,
+        "updated_age_h": 10.7
+      },
+      "reason": "seq 4; updated within 48 h; effective: active",
+      "status": "OK",
+      "sub": "Coordinator"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {},
+      "reason": "control.json valid and normalized",
+      "status": "OK",
+      "sub": "Guard"
+    },
+    {
+      "agent": "GitHub",
+      "metrics": {},
+      "reason": "zumi-alerts PR needs the GitHub API: not checked offline",
+      "status": "SKIP",
+      "sub": "Alerts"
+    },
+    {
+      "agent": "Claude",
+      "metrics": {},
+      "reason": "WARN: Builder",
+      "status": "WARN",
+      "sub": "-"
+    },
+    {
+      "agent": "Claude",
+      "metrics": {},
+      "reason": "market analysis lives in the session report: not checked offline",
+      "status": "SKIP",
+      "sub": "Analyst"
+    },
+    {
+      "agent": "Claude",
+      "metrics": {
+        "last_decision_age_h": 10.7,
+        "last_seq": 4
+      },
+      "reason": "control decision committed within 48 h",
+      "status": "OK",
+      "sub": "Coordinator"
+    },
+    {
+      "agent": "Claude",
+      "metrics": {},
+      "reason": "research runs outside this public repo: not checked offline",
+      "status": "SKIP",
+      "sub": "Researcher"
+    },
+    {
+      "agent": "Claude",
+      "metrics": {
+        "ea_bridge": "2.3",
+        "repo_bridge": "2.8"
+      },
+      "reason": "EA runs bridge 2.3, repo has 2.8: compile in MetaEditor and deploy (user decision)",
+      "status": "WARN",
+      "sub": "Builder"
+    },
+    {
+      "agent": "Claude",
+      "metrics": {},
+      "reason": "code review happens in the session: not checked offline",
+      "status": "SKIP",
+      "sub": "Reviewer"
+    },
+    {
+      "agent": "Claude",
+      "metrics": {},
+      "reason": "user report happens in the session: not checked offline",
+      "status": "SKIP",
+      "sub": "Reporter"
+    }
+  ],
+  "schema": "zumi.agents_status",
+  "v": 1
+}
