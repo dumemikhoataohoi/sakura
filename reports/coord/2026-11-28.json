@@ -1,0 +1,1101 @@
+{
+  "accounts": [
+    "3238681b19703d89"
+  ],
+  "as_of": "2026-11-28T00:00:00Z",
+  "changes": [
+    "global risk_mult 0.50->1.00 (R00)",
+    "global open_risk_pct EA default (R00)"
+  ],
+  "errors": [],
+  "hits": [],
+  "proposal": {
+    "author": "claude",
+    "global": {
+      "expires_unix": 1795996800,
+      "expires_utc": "2026-11-30T00:00:00Z",
+      "pause_all": false,
+      "reason_code": "R00",
+      "risk_mult": 1.0
+    },
+    "methods": {
+      "M043": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M044": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "RCTRN",
+          "RPBL",
+          "SDIMPL",
+          "WDCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M056": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRN",
+          "SDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M058": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH",
+          "WUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M103": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH",
+          "SUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M110": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBN",
+          "SUPBN",
+          "WDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M114": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPH",
+          "SUIMPH",
+          "WDCTRN",
+          "WUCTRL",
+          "WUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M125": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M128": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M132": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUPBH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M136": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "RPBL",
+          "RPBN",
+          "SUPBH",
+          "WDCTRN",
+          "WDPBL",
+          "WUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M147": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M169": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "SDIMPH",
+          "SUIMPN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M181": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPN",
+          "SUPBH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M189": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRN",
+          "SDPBL",
+          "SUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M190": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRH",
+          "RCTRL",
+          "SDIMPN",
+          "SDPBN",
+          "SUPBN",
+          "WDCTRN",
+          "WDIMPL",
+          "WDPBH",
+          "WUIMPL",
+          "WUPBL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M212": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPN",
+          "SUIMPN",
+          "SUPBL",
+          "WUPBH",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M219": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RPBH",
+          "SDIMPN",
+          "SUPBL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M222": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBN",
+          "SUPBL",
+          "SUPBN",
+          "WDCTRH",
+          "WUCTRL",
+          "WUPBL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M223": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M275": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M277": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M279": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRH",
+          "SUCTRN",
+          "SUPBH",
+          "WDPBH",
+          "WUIMPH",
+          "WUPBH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M290": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M305": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M309": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WDCTRH",
+          "WDIMPN",
+          "WDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M317": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRN",
+          "WDCTRH",
+          "WDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M322": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "pause",
+        "phases": [
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.0
+      },
+      "M353": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "SUCTRN",
+          "WUCTRL",
+          "WUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M368": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPH",
+          "SDPBN",
+          "SUCTRH",
+          "SUPBN",
+          "WDCTRL",
+          "WUIMPN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M387": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRN",
+          "RPBL",
+          "SDPBN",
+          "SUIMPH",
+          "SUIMPN",
+          "WDCTRH",
+          "WUIMPN",
+          "WUPBL",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M397": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPN",
+          "SUCTRH",
+          "WUCTRL",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M402": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH",
+          "SUCTRH",
+          "SUCTRL",
+          "SUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M443": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M444": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH",
+          "SUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M476": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M491": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M492": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRN",
+          "SUIMPN",
+          "WDCTRL",
+          "WDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M493": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M504": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH",
+          "SDPBN",
+          "WDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M512": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "RCTRN",
+          "RIMPH",
+          "SUCTRL",
+          "SUPBL",
+          "WDCTRH",
+          "WDIMPN",
+          "WDPBH",
+          "WUIMPN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M515": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M562": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBL",
+          "SUIMPN",
+          "WDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M581": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUPBN",
+          "WDPBN",
+          "WUCTRL",
+          "WUPBL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M583": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "SUIMPN",
+          "WDCTRL",
+          "WDCTRN",
+          "WDPBN",
+          "WUCTRL",
+          "WUPBL",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M588": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRN",
+          "SUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M596": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRN",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M606": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RIMPH",
+          "SDIMPH",
+          "SUCTRL",
+          "WUCTRH",
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M607": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH",
+          "SDCTRN",
+          "SUIMPH",
+          "SUIMPN",
+          "WUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M628": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRN",
+          "SDCTRN",
+          "SUCTRN",
+          "WDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M675": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBN",
+          "SUCTRL",
+          "SUIMPL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M682": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RIMPN",
+          "SUIMPH",
+          "SUPBH",
+          "SUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M689": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "pause",
+        "phases": [
+          "WDCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.0
+      },
+      "M701": {
+        "expires_unix": 1795906800,
+        "expires_utc": "2026-11-28T23:00:00Z",
+        "mode": "pause",
+        "phases": [
+          "none"
+        ],
+        "reason_code": "R01",
+        "risk_mult": 0.0
+      },
+      "M704": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUIMPH",
+          "WDIMPN",
+          "WDPBN",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M705": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WUCTRN",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M717": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUPBL",
+          "WDCTRH",
+          "WDIMPL",
+          "WUIMPN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M751": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPN",
+          "WDCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M765": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "pause",
+        "phases": [
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.0
+      },
+      "M767": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "pause",
+        "phases": [
+          "RIMPN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.0
+      },
+      "M780": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RIMPN",
+          "SDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M783": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRL",
+          "SDIMPL",
+          "SUCTRH",
+          "SUCTRL",
+          "SUIMPL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M786": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUIMPL",
+          "SUIMPN",
+          "WDCTRN",
+          "WUPBH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M795": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M798": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M805": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M810": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRH",
+          "WUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M820": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPN",
+          "WUIMPL",
+          "WUPBL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M823": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M828": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRL",
+          "SUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M835": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WUIMPN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M845": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRH",
+          "WDCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M847": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RPBL",
+          "SDPBL",
+          "SUCTRH",
+          "SUPBH",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M858": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDIMPH",
+          "WDPBH",
+          "WUCTRH",
+          "WUIMPH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M877": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "WUCTRL",
+          "WUCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M891": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M896": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "SDPBN",
+          "WDCTRL",
+          "WDIMPL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M903": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "SDIMPL",
+          "SUIMPN",
+          "WUIMPL",
+          "WUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M910": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRH"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M921": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RIMPL",
+          "WDCTRH",
+          "WDCTRL",
+          "WDPBN",
+          "WUCTRH",
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M926": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RIMPN",
+          "SDCTRN",
+          "SUCTRL",
+          "WDPBH",
+          "WUIMPL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M929": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "RIMPN",
+          "SUIMPH",
+          "SUPBL",
+          "WDIMPL",
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M937": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDCTRN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M959": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M963": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RCTRL",
+          "RIMPL",
+          "RIMPN",
+          "RPBH",
+          "RPBN",
+          "SDIMPN",
+          "SUIMPN",
+          "WDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M973": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "RPBL",
+          "SUPBL",
+          "SUPBN",
+          "WUCTRL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M976": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SUCTRL",
+          "WDPBN"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      },
+      "M977": {
+        "expires_unix": 1796079600,
+        "expires_utc": "2026-11-30T23:00:00Z",
+        "mode": "reduce",
+        "phases": [
+          "SDPBL",
+          "SUPBL"
+        ],
+        "reason_code": "R02",
+        "risk_mult": 0.5
+      }
+    },
+    "news_blocks": [
+      {
+        "end_unix": 1795995900,
+        "end_utc": "2026-11-29T23:45:00Z",
+        "kind": "block",
+        "reason_code": "R04",
+        "start_unix": 1795993200,
+        "start_utc": "2026-11-29T23:00:00Z"
+      }
+    ],
+    "notes_vi": "\u0110\u1ec1 xu\u1ea5t t\u1ef1 \u0111\u1ed9ng theo quy t\u1eafc \u0111\u0103ng k\u00fd tr\u01b0\u1edbc; Claude xem x\u00e9t v\u00e0 quy\u1ebft \u0111\u1ecbnh.",
+    "seq": 7,
+    "updated_unix": 1795824000,
+    "updated_utc": "2026-11-28T00:00:00Z",
+    "v": 1
+  },
+  "restored": []
+}
